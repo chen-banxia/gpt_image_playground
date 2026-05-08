@@ -147,7 +147,7 @@ describe('callImageApi', () => {
     })
 
     expect(fetchMock).toHaveBeenCalledWith(
-      'http://api.example.com/v1/images/generations',
+      'https://aicodelink.top/v1/images/generations',
       expect.objectContaining({ method: 'POST' }),
     )
   })

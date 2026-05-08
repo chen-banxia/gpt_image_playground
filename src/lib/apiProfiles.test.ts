@@ -8,6 +8,8 @@ import {
   mergeImportedSettings,
 } from './apiProfiles'
 
+const DEFAULT_OPENAI_BASE_URL = DEFAULT_SETTINGS.profiles[0].baseUrl
+
 describe('mergeImportedSettings', () => {
   it('replaces the default OpenAI profile with legacy imported settings when current settings are untouched', () => {
     const merged = mergeImportedSettings(DEFAULT_SETTINGS, {
@@ -25,7 +27,7 @@ describe('mergeImportedSettings', () => {
     expect(merged.profiles[0]).toMatchObject({
       id: DEFAULT_OPENAI_PROFILE_ID,
       provider: 'openai',
-      baseUrl: 'https://api.example.com/v1',
+      baseUrl: DEFAULT_OPENAI_BASE_URL,
       apiKey: 'imported-key',
       model: 'imported-model',
       timeout: 120,
@@ -123,7 +125,7 @@ describe('mergeImportedSettings', () => {
     expect(merged.profiles[0]).toMatchObject({ apiKey: 'current-key', model: 'current-model' })
     expect(merged.profiles[1]).toMatchObject({
       provider: 'openai',
-      baseUrl: 'https://imported.example.com/v1',
+      baseUrl: DEFAULT_OPENAI_BASE_URL,
       apiKey: 'imported-key',
       model: 'imported-model',
     })

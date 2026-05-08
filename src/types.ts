@@ -20,6 +20,7 @@ export interface AppSettings {
   /** 旧版单配置字段：保留用于导入/查询参数兼容，实际请求以 active profile 为准 */
   baseUrl: string
   apiKey: string
+  rememberApiKey: boolean
   model: string
   timeout: number
   apiMode: ApiMode

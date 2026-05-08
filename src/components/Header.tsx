@@ -11,29 +11,56 @@ export default function Header() {
   return (
     <header data-no-drag-select className="safe-area-top sticky top-0 z-40 bg-white/80 dark:bg-gray-950/80 backdrop-blur border-b border-gray-200 dark:border-white/[0.08]">
       <div className="safe-area-x safe-header-inner max-w-7xl mx-auto flex items-center justify-between">
-        <div className="flex items-start gap-1">
-          <h1 className="text-lg font-bold tracking-tight">
-            <a
-              href="https://github.com/CookSleep/gpt_image_playground"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-gray-800 dark:text-gray-100 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-            >
-              GPT Image Playground
-            </a>
-          </h1>
-          {hasUpdate && latestRelease && (
-            <a
-              href={latestRelease.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={dismiss}
-              className="px-1.5 py-0.5 mt-0.5 rounded border border-red-500/30 text-[10px] font-bold bg-red-500 text-white hover:bg-red-600 transition-colors animate-fade-in leading-none"
-              title={`新版本 ${latestRelease.tag}`}
-            >
-              NEW
-            </a>
-          )}
+        <div className="flex min-w-0 items-center gap-2">
+          <div className="flex flex-shrink-0 items-start gap-1">
+            <h1 className="text-lg font-bold tracking-tight">
+              <a
+                href="https://aicodelink.top/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-gray-800 transition-colors hover:text-gray-600 dark:text-gray-100 dark:hover:text-gray-300"
+              >
+                Code Link
+              </a>
+            </h1>
+            {hasUpdate && latestRelease && (
+              <a
+                href={latestRelease.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={dismiss}
+                className="mt-0.5 rounded border border-red-500/30 bg-red-500 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white transition-colors hover:bg-red-600 animate-fade-in"
+                title={`新版本 ${latestRelease.tag}`}
+              >
+                NEW
+              </a>
+            )}
+          </div>
+          <a
+            href="https://aicodelink.top"
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Code Link，一家稳定的大模型中转站，支持claude、gpt、gemini等，国内直连，稳定快速。"
+            className="group hidden min-w-0 items-center gap-1.5 rounded-full border border-blue-200/70 bg-blue-50/80 px-2.5 py-1 text-xs text-gray-600 shadow-sm shadow-blue-900/5 transition hover:border-blue-300 hover:bg-blue-100/80 hover:text-gray-800 dark:border-blue-400/20 dark:bg-blue-400/10 dark:text-gray-300 dark:hover:bg-blue-400/15 dark:hover:text-gray-100 sm:inline-flex"
+          >
+            <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-emerald-500 shadow-[0_0_0_3px_rgba(16,185,129,0.16)]" />
+            <span className="hidden font-medium text-blue-700 dark:text-blue-300 md:inline">大模型中转站</span>
+            <span className="max-w-[32rem] truncate">
+              支持 claude / gpt / gemini，国内直连，稳定快速
+            </span>
+            <svg className="h-3.5 w-3.5 flex-shrink-0 text-blue-500 transition-transform group-hover:translate-x-0.5 dark:text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 17L17 7M9 7h8v8" />
+            </svg>
+          </a>
+          <a
+            href="https://aicodelink.top"
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Code Link，一家稳定的大模型中转站，支持claude、gpt、gemini等，国内直连，稳定快速。"
+            className="inline-flex flex-shrink-0 items-center rounded-full border border-blue-200/70 bg-blue-50/80 px-2 py-1 text-[11px] font-medium text-blue-700 transition hover:bg-blue-100 dark:border-blue-400/20 dark:bg-blue-400/10 dark:text-blue-300 dark:hover:bg-blue-400/15 sm:hidden"
+          >
+            中转站
+          </a>
         </div>
         <div className="flex items-center gap-1">
           <button

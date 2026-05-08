@@ -298,13 +298,23 @@ export const useStore = create<AppState>()(
     }),
     {
       name: 'gpt-image-playground',
-      partialize: (state) => ({
-        settings: state.settings,
-        params: state.params,
-        prompt: state.prompt,
-        inputImages: state.inputImages.map((img) => ({ id: img.id, dataUrl: '' })),
-        dismissedCodexCliPrompts: state.dismissedCodexCliPrompts,
-      }),
+      partialize: (state) => {
+        const shouldRememberApiKey = state.settings.rememberApiKey
+        const sanitizedSettings: AppSettings = shouldRememberApiKey
+          ? state.settings
+          : {
+              ...state.settings,
+              apiKey: '',
+              profiles: state.settings.profiles.map((profile) => ({ ...profile, apiKey: '' })),
+            }
+        return {
+          settings: sanitizedSettings,
+          params: state.params,
+          prompt: state.prompt,
+          inputImages: state.inputImages.map((img) => ({ id: img.id, dataUrl: '' })),
+          dismissedCodexCliPrompts: state.dismissedCodexCliPrompts,
+        }
+      },
     },
   ),
 )
