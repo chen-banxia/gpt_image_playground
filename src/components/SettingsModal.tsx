@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useStore, exportData, importData, clearAllData } from '../store'
-import { getActiveApiProfile, normalizeSettings } from '../lib/apiProfiles'
+import { getActiveApiProfile, normalizeSettings, DEFAULT_API_TIMEOUT } from '../lib/apiProfiles'
 import type { AppSettings } from '../types'
 import { useCloseOnEscape } from '../hooks/useCloseOnEscape'
 
@@ -14,6 +14,7 @@ export default function SettingsModal() {
 
   const [draft, setDraft] = useState<AppSettings>(normalizeSettings(settings))
   const [showApiKey, setShowApiKey] = useState(false)
+  const [timeoutInput, setTimeoutInput] = useState('')
 
   const activeProfile = getActiveApiProfile(draft)
 
@@ -26,7 +27,9 @@ export default function SettingsModal() {
     }
     if (wasSettingsOpenRef.current) return
     wasSettingsOpenRef.current = true
-    setDraft(normalizeSettings(settings))
+    const normalized = normalizeSettings(settings)
+    setDraft(normalized)
+    setTimeoutInput(String(getActiveApiProfile(normalized).timeout))
   }, [showSettings, settings])
 
   const commitSettings = (nextDraft: AppSettings) => {
@@ -47,8 +50,22 @@ export default function SettingsModal() {
     if (commit) commitSettings(nextDraft)
   }
 
+  const commitTimeoutInput = (raw: string) => {
+    const parsed = Math.round(Number(raw))
+    const next = Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_API_TIMEOUT
+    setTimeoutInput(String(next))
+    const nextDraft: AppSettings = {
+      ...draft,
+      timeout: next,
+      profiles: draft.profiles.map((profile) =>
+        profile.id === activeProfile.id ? { ...profile, timeout: next } : profile,
+      ),
+    }
+    commitSettings(nextDraft)
+  }
+
   const handleClose = () => {
-    commitSettings(draft)
+    commitTimeoutInput(timeoutInput)
     setShowSettings(false)
   }
 
@@ -195,6 +212,27 @@ export default function SettingsModal() {
                 </div>
                 <div data-selectable-text className="text-[10px] text-gray-400 dark:text-gray-500">
                   默认不记住；开启后会保存到当前浏览器本地，方便刷新后继续使用。
+                </div>
+              </div>
+
+              <div className="block">
+                <span className="block text-xs text-gray-500 dark:text-gray-400 mb-1">请求超时时间（秒）</span>
+                <input
+                  value={timeoutInput}
+                  onChange={(e) => setTimeoutInput(e.target.value)}
+                  onBlur={(e) => commitTimeoutInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') (e.currentTarget as HTMLInputElement).blur()
+                  }}
+                  type="number"
+                  min={1}
+                  step={1}
+                  inputMode="numeric"
+                  placeholder={String(DEFAULT_API_TIMEOUT)}
+                  className="w-full rounded-xl border border-gray-200/70 bg-white/60 px-3 py-2 text-sm text-gray-700 outline-none transition focus:border-blue-300 dark:border-white/[0.08] dark:bg-white/[0.03] dark:text-gray-200 dark:focus:border-blue-500/50"
+                />
+                <div data-selectable-text className="mt-1 text-[10px] text-gray-400 dark:text-gray-500">
+                  画图请求超过该时间未完成则中止。默认 {DEFAULT_API_TIMEOUT} 秒（5 分钟），仅作用于当前配置。
                 </div>
               </div>
             </div>
