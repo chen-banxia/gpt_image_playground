@@ -1,7 +1,7 @@
 {
-  "name": "Code Link",
-  "short_name": "Code Link",
-  "description": "Code Link 大模型中转站",
+  "name": "灵绘",
+  "short_name": "灵绘",
+  "description": "灵绘 AI 画图",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

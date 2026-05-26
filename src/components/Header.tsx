@@ -20,7 +20,7 @@ export default function Header() {
                 rel="noopener noreferrer"
                 className="text-gray-800 transition-colors hover:text-gray-600 dark:text-gray-100 dark:hover:text-gray-300"
               >
-                Code Link
+                灵绘
               </a>
             </h1>
             {hasUpdate && latestRelease && (
@@ -37,16 +37,41 @@ export default function Header() {
             )}
           </div>
           <a
+            href="https://colorflowai.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            title="画图后端：在 colorflowai.com 注册账号，创建令牌后填入本网页设置中即可使用"
+            className="group hidden min-w-0 items-center gap-1.5 rounded-full border border-purple-200/70 bg-purple-50/80 px-2.5 py-1 text-xs text-gray-600 shadow-sm shadow-purple-900/5 transition hover:border-purple-300 hover:bg-purple-100/80 hover:text-gray-800 dark:border-purple-400/20 dark:bg-purple-400/10 dark:text-gray-300 dark:hover:bg-purple-400/15 dark:hover:text-gray-100 sm:inline-flex"
+          >
+            <svg className="h-3.5 w-3.5 flex-shrink-0 text-purple-500 dark:text-purple-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+            </svg>
+            <span className="hidden font-medium text-purple-700 dark:text-purple-300 md:inline">画图后端</span>
+            <span className="max-w-[32rem] truncate">注册获取令牌</span>
+            <svg className="h-3.5 w-3.5 flex-shrink-0 text-purple-500 transition-transform group-hover:translate-x-0.5 dark:text-purple-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 17L17 7M9 7h8v8" />
+            </svg>
+          </a>
+          <a
+            href="https://colorflowai.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            title="画图后端：在 colorflowai.com 注册账号，创建令牌后填入本网页设置中即可使用"
+            className="inline-flex flex-shrink-0 items-center rounded-full border border-purple-200/70 bg-purple-50/80 px-2 py-1 text-[11px] font-medium text-purple-700 transition hover:bg-purple-100 dark:border-purple-400/20 dark:bg-purple-400/10 dark:text-purple-300 dark:hover:bg-purple-400/15 sm:hidden"
+          >
+            画图后端
+          </a>
+          <a
             href="https://aicodelink.top"
             target="_blank"
             rel="noopener noreferrer"
-            title="Code Link，一家稳定的大模型中转站，支持claude、gpt、gemini等，国内直连，稳定快速。"
+            title="Code Link，一家稳定的海外大模型中转站，支持claude、gpt、gemini，只服务于海外用户！"
             className="group hidden min-w-0 items-center gap-1.5 rounded-full border border-blue-200/70 bg-blue-50/80 px-2.5 py-1 text-xs text-gray-600 shadow-sm shadow-blue-900/5 transition hover:border-blue-300 hover:bg-blue-100/80 hover:text-gray-800 dark:border-blue-400/20 dark:bg-blue-400/10 dark:text-gray-300 dark:hover:bg-blue-400/15 dark:hover:text-gray-100 sm:inline-flex"
           >
             <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-emerald-500 shadow-[0_0_0_3px_rgba(16,185,129,0.16)]" />
             <span className="hidden font-medium text-blue-700 dark:text-blue-300 md:inline">大模型中转站</span>
             <span className="max-w-[32rem] truncate">
-              支持 claude / gpt / gemini，国内直连，稳定快速
+              支持 claude / gpt / gemini
             </span>
             <svg className="h-3.5 w-3.5 flex-shrink-0 text-blue-500 transition-transform group-hover:translate-x-0.5 dark:text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 17L17 7M9 7h8v8" />
@@ -56,7 +81,7 @@ export default function Header() {
             href="https://aicodelink.top"
             target="_blank"
             rel="noopener noreferrer"
-            title="Code Link，一家稳定的大模型中转站，支持claude、gpt、gemini等，国内直连，稳定快速。"
+            title="Code Link，一家稳定的海外大模型中转站，支持claude、gpt、gemini，只服务于海外用户！"
             className="inline-flex flex-shrink-0 items-center rounded-full border border-blue-200/70 bg-blue-50/80 px-2 py-1 text-[11px] font-medium text-blue-700 transition hover:bg-blue-100 dark:border-blue-400/20 dark:bg-blue-400/10 dark:text-blue-300 dark:hover:bg-blue-400/15 sm:hidden"
           >
             中转站

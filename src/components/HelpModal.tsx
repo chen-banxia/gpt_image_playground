@@ -141,7 +141,7 @@ export default function HelpModal({ onClose }: HelpModalProps) {
               rel="noopener noreferrer"
               className="flex items-center gap-2 text-sm font-medium text-gray-500 transition-colors hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
             >
-              Code Link
+              灵绘
             </a>
             <span className="text-center text-[11px] text-gray-400 dark:text-gray-500">
               基于开源项目{' '}
