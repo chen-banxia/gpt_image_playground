@@ -9,6 +9,25 @@ export const DEFAULT_FAL_MODEL = 'openai/gpt-image-2'
 export const DEFAULT_OPENAI_PROFILE_ID = 'default-openai'
 export const DEFAULT_API_TIMEOUT = 600
 
+/**
+ * 历史上默认超时时间曾被设为 200 秒（commit 87faea8），后又调回 600 秒。
+ * 自定义超时功能加入前，存量配置会把当时的默认值固化在 localStorage 中，
+ * 导致老用户仍卡在 200 秒（对图生图偏紧）。这里把恰好等于旧默认值的超时
+ * 迁移到当前默认值，用户手动设过的其他值不动。
+ */
+const LEGACY_DEFAULT_API_TIMEOUTS = [200]
+
+function migrateLegacyTimeout(value: number): number {
+  return LEGACY_DEFAULT_API_TIMEOUTS.includes(value) ? DEFAULT_API_TIMEOUT : value
+}
+
+function readTimeout(value: unknown, fallback: number): number {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return migrateLegacyTimeout(value)
+  }
+  return fallback
+}
+
 export function createDefaultOpenAIProfile(overrides: Partial<ApiProfile> = {}): ApiProfile {
   return {
     id: DEFAULT_OPENAI_PROFILE_ID,
@@ -78,7 +97,7 @@ export function normalizeApiProfile(input: unknown, fallback?: Partial<ApiProfil
       : typeof record.baseUrl === 'string' ? record.baseUrl : defaults.baseUrl,
     apiKey: typeof record.apiKey === 'string' ? record.apiKey : defaults.apiKey,
     model: typeof record.model === 'string' && record.model.trim() ? record.model : defaults.model,
-    timeout: typeof record.timeout === 'number' && Number.isFinite(record.timeout) ? record.timeout : defaults.timeout,
+    timeout: readTimeout(record.timeout, defaults.timeout),
     apiMode,
     codexCli: provider === 'openai' ? true : Boolean(record.codexCli),
     apiProxy: Boolean(record.apiProxy),
@@ -91,7 +110,7 @@ export function normalizeSettings(input: Partial<AppSettings> | unknown): AppSet
     baseUrl: DEFAULT_BASE_URL,
     apiKey: typeof record.apiKey === 'string' ? record.apiKey : '',
     model: typeof record.model === 'string' && record.model.trim() ? record.model : DEFAULT_IMAGES_MODEL,
-    timeout: typeof record.timeout === 'number' && Number.isFinite(record.timeout) ? record.timeout : DEFAULT_API_TIMEOUT,
+    timeout: readTimeout(record.timeout, DEFAULT_API_TIMEOUT),
     apiMode: record.apiMode === 'responses' ? 'responses' : 'images',
     codexCli: Boolean(record.codexCli),
     apiProxy: Boolean(record.apiProxy),
@@ -131,7 +150,7 @@ export function getActiveApiProfile(settings: Partial<AppSettings> | unknown): A
       : typeof record.baseUrl === 'string' ? record.baseUrl : profile.baseUrl,
     apiKey: typeof record.apiKey === 'string' ? record.apiKey : profile.apiKey,
     model: typeof record.model === 'string' && record.model.trim() ? record.model : profile.model,
-    timeout: typeof record.timeout === 'number' && Number.isFinite(record.timeout) ? record.timeout : profile.timeout,
+    timeout: readTimeout(record.timeout, profile.timeout),
     apiMode: record.apiMode === 'images' || record.apiMode === 'responses' ? record.apiMode : profile.apiMode,
     codexCli: profile.provider === 'openai'
       ? true

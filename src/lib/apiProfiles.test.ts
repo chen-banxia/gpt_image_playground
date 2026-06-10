@@ -1,11 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import {
+  DEFAULT_API_TIMEOUT,
   DEFAULT_FAL_BASE_URL,
   DEFAULT_FAL_MODEL,
   DEFAULT_IMAGES_MODEL,
   DEFAULT_OPENAI_PROFILE_ID,
   DEFAULT_SETTINGS,
+  getActiveApiProfile,
   mergeImportedSettings,
+  normalizeApiProfile,
+  normalizeSettings,
 } from './apiProfiles'
 
 const DEFAULT_OPENAI_BASE_URL = DEFAULT_SETTINGS.profiles[0].baseUrl
@@ -214,5 +218,49 @@ describe('mergeImportedSettings', () => {
     expect(merged.profiles).toHaveLength(2)
     expect(merged.profiles[0]).toMatchObject({ apiKey: 'current-key', model: 'current-model' })
     expect(merged.profiles[1]).toMatchObject({ provider: 'fal', apiKey: 'fal-key', model: DEFAULT_FAL_MODEL })
+  })
+})
+
+describe('legacy timeout migration', () => {
+  it('migrates the legacy default timeout (200) to the current default in normalizeApiProfile', () => {
+    const profile = normalizeApiProfile({
+      provider: 'openai',
+      apiKey: 'k',
+      model: DEFAULT_IMAGES_MODEL,
+      timeout: 200,
+    })
+
+    expect(profile.timeout).toBe(DEFAULT_API_TIMEOUT)
+  })
+
+  it('keeps a user-customized timeout untouched', () => {
+    const profile = normalizeApiProfile({
+      provider: 'openai',
+      apiKey: 'k',
+      model: DEFAULT_IMAGES_MODEL,
+      timeout: 300,
+    })
+
+    expect(profile.timeout).toBe(300)
+  })
+
+  it('migrates the legacy timeout through normalizeSettings (legacy single-profile shape)', () => {
+    const settings = normalizeSettings({
+      apiKey: 'k',
+      model: DEFAULT_IMAGES_MODEL,
+      timeout: 200,
+    })
+
+    expect(settings.timeout).toBe(DEFAULT_API_TIMEOUT)
+    expect(settings.profiles[0].timeout).toBe(DEFAULT_API_TIMEOUT)
+  })
+
+  it('migrates the legacy timeout through getActiveApiProfile legacy overrides', () => {
+    const profile = getActiveApiProfile({
+      ...DEFAULT_SETTINGS,
+      timeout: 200,
+    })
+
+    expect(profile.timeout).toBe(DEFAULT_API_TIMEOUT)
   })
 })

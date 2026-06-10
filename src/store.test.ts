@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { DEFAULT_PARAMS } from './types'
 import { DEFAULT_SETTINGS } from './lib/apiProfiles'
 import type { TaskRecord } from './types'
-import { editOutputs, markInterruptedOpenAIRunningTasks, submitTask, useStore } from './store'
+import { editOutputs, markExpiredOpenAIRunningTasks, submitTask, useStore } from './store'
 
 const imageA = { id: 'image-a', dataUrl: 'data:image/png;base64,a' }
 
@@ -77,29 +77,31 @@ describe('mask draft lifecycle in store actions', () => {
   })
 })
 
-describe('interrupted OpenAI running tasks', () => {
-  it('marks legacy and OpenAI running tasks as interrupted', () => {
-    const now = 10_000
+describe('expired OpenAI running tasks', () => {
+  it('marks only timed-out legacy and OpenAI running tasks as expired', () => {
+    const now = 700_000
     const legacyRunning = task({ id: 'legacy-running', status: 'running', createdAt: 1_000, finishedAt: null, elapsed: null })
     const openAIRunning = task({ id: 'openai-running', apiProvider: 'openai', status: 'running', createdAt: 2_000, finishedAt: null, elapsed: null })
+    const openAIStillRunning = task({ id: 'openai-still-running', apiProvider: 'openai', status: 'running', createdAt: 200_000, finishedAt: null, elapsed: null })
     const falRunning = task({ id: 'fal-running', apiProvider: 'fal', status: 'running', createdAt: 3_000, finishedAt: null, elapsed: null })
     const doneTask = task({ id: 'done-task', apiProvider: 'openai', status: 'done' })
 
-    const result = markInterruptedOpenAIRunningTasks([legacyRunning, openAIRunning, falRunning, doneTask], now)
+    const result = markExpiredOpenAIRunningTasks([legacyRunning, openAIRunning, openAIStillRunning, falRunning, doneTask], DEFAULT_SETTINGS, now)
 
-    expect(result.interruptedTasks.map((item) => item.id)).toEqual(['legacy-running', 'openai-running'])
+    expect(result.expiredTasks.map((item) => item.id)).toEqual(['legacy-running', 'openai-running'])
     expect(result.tasks.find((item) => item.id === 'legacy-running')).toMatchObject({
       status: 'error',
-      error: expect.stringContaining('请求中断'),
+      error: expect.stringContaining('请求超时'),
       finishedAt: now,
-      elapsed: 9_000,
+      elapsed: 699_000,
     })
     expect(result.tasks.find((item) => item.id === 'openai-running')).toMatchObject({
       status: 'error',
-      error: expect.stringContaining('请求中断'),
+      error: expect.stringContaining('请求超时'),
       finishedAt: now,
-      elapsed: 8_000,
+      elapsed: 698_000,
     })
+    expect(result.tasks.find((item) => item.id === 'openai-still-running')).toEqual(openAIStillRunning)
     expect(result.tasks.find((item) => item.id === 'fal-running')).toEqual(falRunning)
     expect(result.tasks.find((item) => item.id === 'done-task')).toEqual(doneTask)
   })

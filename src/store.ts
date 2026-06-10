@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type {
   AppSettings,
+  ApiProfile,
   TaskParams,
   InputImage,
   MaskDraft,
@@ -36,7 +37,7 @@ const imageCache = new Map<string, string>()
 const FAL_RECOVERY_POLL_MS = 10_000
 const falRecoveryTimers = new Map<string, ReturnType<typeof setTimeout>>()
 const openAIWatchdogTimers = new Map<string, ReturnType<typeof setTimeout>>()
-const OPENAI_INTERRUPTED_ERROR = '请求中断'
+const executingTaskIds = new Set<string>()
 
 function createOpenAITimeoutError(timeoutSeconds: number) {
   return `请求超时：超过 ${timeoutSeconds} 秒仍未完成，请稍后重试或提高超时时间。`
@@ -331,6 +332,42 @@ export function getCodexCliPromptKey(settings: AppSettings): string {
   return `${profile.baseUrl}\n${profile.apiKey}`
 }
 
+function getTaskApiProfile(settings: AppSettings, task: TaskRecord) {
+  const normalized = normalizeSettings(settings)
+  const provider = task.apiProvider ?? 'openai'
+  const active = getActiveApiProfile(normalized)
+  if (
+    active.provider === provider &&
+    (!task.apiProfileName || task.apiProfileName === active.name || task.apiModel === active.model)
+  ) {
+    return active
+  }
+
+  return normalized.profiles.find((profile) =>
+    profile.provider === provider &&
+    (profile.name === task.apiProfileName || profile.model === task.apiModel),
+  ) ?? (active.provider === provider ? active : null) ?? normalized.profiles.find((profile) => profile.provider === provider) ?? null
+}
+
+function getOpenAITaskProfile(settings: AppSettings, task: TaskRecord) {
+  const profile = getTaskApiProfile(settings, { ...task, apiProvider: 'openai' })
+  return profile?.provider === 'openai' ? profile : null
+}
+
+function activateProfileForTask(settings: AppSettings, profile: ApiProfile): AppSettings {
+  return normalizeSettings({
+    ...settings,
+    baseUrl: profile.baseUrl,
+    apiKey: profile.apiKey,
+    model: profile.model,
+    timeout: profile.timeout,
+    apiMode: profile.apiMode,
+    codexCli: profile.codexCli,
+    apiProxy: profile.apiProxy,
+    activeProfileId: profile.id,
+  })
+}
+
 function isOpenAITask(task: TaskRecord) {
   return (task.apiProvider ?? 'openai') === 'openai'
 }
@@ -339,24 +376,28 @@ function isRunningOpenAITask(task: TaskRecord) {
   return task.status === 'running' && isOpenAITask(task)
 }
 
-export function markInterruptedOpenAIRunningTasks(tasks: TaskRecord[], now = Date.now()) {
-  const interruptedTasks: TaskRecord[] = []
+export function markExpiredOpenAIRunningTasks(tasks: TaskRecord[], settings: AppSettings, now = Date.now()) {
+  const expiredTasks: TaskRecord[] = []
   const updatedTasks = tasks.map((task) => {
     if (!isRunningOpenAITask(task)) return task
+
+    const timeoutSeconds = getOpenAITaskProfile(settings, task)?.timeout ?? DEFAULT_SETTINGS.timeout
+    const elapsed = Math.max(0, now - task.createdAt)
+    if (elapsed < timeoutSeconds * 1000) return task
 
     const updated: TaskRecord = {
       ...task,
       status: 'error',
-      error: OPENAI_INTERRUPTED_ERROR,
+      error: createOpenAITimeoutError(timeoutSeconds),
       falRecoverable: false,
       finishedAt: now,
-      elapsed: Math.max(0, now - task.createdAt),
+      elapsed,
     }
-    interruptedTasks.push(updated)
+    expiredTasks.push(updated)
     return updated
   })
 
-  return { tasks: updatedTasks, interruptedTasks }
+  return { tasks: updatedTasks, expiredTasks }
 }
 
 function clearOpenAIWatchdogTimer(taskId: string) {
@@ -519,9 +560,11 @@ async function recoverFalTask(taskId: string) {
 /** 初始化：从 IndexedDB 加载任务和图片缓存，清理孤立图片 */
 export async function initStore() {
   const storedTasks = await getAllTasks()
-  const { tasks, interruptedTasks } = markInterruptedOpenAIRunningTasks(storedTasks)
-  await Promise.all(interruptedTasks.map((task) => putTask(task)))
+  const settings = useStore.getState().settings
+  const { tasks, expiredTasks } = markExpiredOpenAIRunningTasks(storedTasks, settings)
+  await Promise.all(expiredTasks.map((task) => putTask(task)))
   useStore.getState().setTasks(tasks)
+  const openAITasksToResume: string[] = []
   for (const task of tasks) {
     if (
       task.apiProvider === 'fal' &&
@@ -530,6 +573,10 @@ export async function initStore() {
       (task.status === 'running' || task.falRecoverable)
     ) {
       scheduleFalRecovery(task.id, 0)
+    } else if (isRunningOpenAITask(task)) {
+      const profile = getOpenAITaskProfile(settings, task)
+      scheduleOpenAIWatchdog(task.id, profile?.timeout ?? DEFAULT_SETTINGS.timeout)
+      openAITasksToResume.push(task.id)
     }
   }
 
@@ -560,6 +607,10 @@ export async function initStore() {
     .filter((img) => img.dataUrl)
   if (restoredInputImages.length !== persistedInputImages.length || restoredInputImages.some((img, index) => img.dataUrl !== persistedInputImages[index]?.dataUrl)) {
     useStore.getState().setInputImages(restoredInputImages)
+  }
+
+  for (const taskId of openAITasksToResume) {
+    executeTask(taskId)
   }
 }
 
@@ -656,10 +707,15 @@ export async function submitTask(options: { allowFullMask?: boolean } = {}) {
 }
 
 async function executeTask(taskId: string) {
+  if (executingTaskIds.has(taskId)) return
   const { settings } = useStore.getState()
   const task = useStore.getState().tasks.find((t) => t.id === taskId)
   if (!task) return
-  const activeProfile = getActiveApiProfile(settings)
+  if (task.status !== 'running') return
+  executingTaskIds.add(taskId)
+  const taskProfile = getTaskApiProfile(settings, task)
+  const taskSettings = taskProfile ? activateProfileForTask(settings, taskProfile) : settings
+  const activeProfile = taskProfile ?? getActiveApiProfile(settings)
   const taskProvider = task.apiProvider ?? activeProfile.provider
   let falRequestInfo: { requestId: string; endpoint: string } | null = task.falRequestId && task.falEndpoint
     ? { requestId: task.falRequestId, endpoint: task.falEndpoint }
@@ -684,7 +740,7 @@ async function executeTask(taskId: string) {
     }
 
     const result = await callImageApi({
-      settings,
+      settings: taskSettings,
       prompt: task.prompt,
       params: task.params,
       inputImageDataUrls: inputDataUrls,
@@ -786,6 +842,7 @@ async function executeTask(taskId: string) {
       useStore.getState().setDetailTaskId(taskId)
     }
   } finally {
+    executingTaskIds.delete(taskId)
     // 释放输入图片的内存缓存（已持久化到 IndexedDB，后续按需从 DB 加载）
     for (const imgId of task.inputImageIds) {
       imageCache.delete(imgId)

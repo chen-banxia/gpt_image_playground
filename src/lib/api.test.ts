@@ -147,7 +147,7 @@ describe('callImageApi', () => {
     })
 
     expect(fetchMock).toHaveBeenCalledWith(
-      'https://aicodelink.top/v1/images/generations',
+      'https://colorflowai.com/v1/images/generations',
       expect.objectContaining({ method: 'POST' }),
     )
   })

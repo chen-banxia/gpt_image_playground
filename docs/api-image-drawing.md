@@ -60,7 +60,7 @@ interface ApiProfile {
 默认值：
 
 ```ts
-baseUrl: VITE_DEFAULT_API_URL || 'https://aicodelink.top/v1'
+baseUrl: VITE_DEFAULT_API_URL || 'https://colorflowai.com/v1'
 images model: 'gpt-image-2'
 responses model: 'gpt-5.5'
 timeout: 600 秒
