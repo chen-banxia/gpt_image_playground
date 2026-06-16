@@ -4,6 +4,7 @@ import { useStore } from './store'
 import { normalizeBaseUrl } from './lib/api'
 import { normalizeSettings, switchApiProfileProvider } from './lib/apiProfiles'
 import { useDockerApiUrlMigrationNotice } from './hooks/useDockerApiUrlMigrationNotice'
+import { setActiveLanguage } from './i18n'
 import type { ApiMode, ApiProvider, AppSettings } from './types'
 import Header from './components/Header'
 import SearchBar from './components/SearchBar'
@@ -19,7 +20,13 @@ import ImageContextMenu from './components/ImageContextMenu'
 
 export default function App() {
   const setSettings = useStore((s) => s.setSettings)
+  const language = useStore((s) => s.settings.language)
   useDockerApiUrlMigrationNotice()
+
+  useEffect(() => {
+    setActiveLanguage(language)
+    document.documentElement.lang = language === 'zh' ? 'zh-CN' : 'en'
+  }, [language])
 
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search)

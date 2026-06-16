@@ -1,4 +1,5 @@
 import type { AppSettings, TaskParams } from '../types'
+import { tCurrent } from '../i18n'
 
 export const MIME_MAP: Record<string, string> = {
   png: 'image/png',
@@ -65,12 +66,12 @@ export function getDataUrlDecodedByteSize(dataUrl: string): number {
 
 function assertMaxBytes(label: string, bytes: number, maxBytes: number) {
   if (bytes > maxBytes) {
-    throw new Error(`${label}过大：${formatMiB(bytes)}，上限为 ${formatMiB(maxBytes)}`)
+    throw new Error(tCurrent('payloadTooLarge', { label, size: formatMiB(bytes), max: formatMiB(maxBytes) }))
   }
 }
 
 export function assertImageInputPayloadSize(bytes: number) {
-  assertMaxBytes('图像输入有效负载总大小', bytes, MAX_IMAGE_INPUT_PAYLOAD_BYTES)
+  assertMaxBytes(tCurrent('imageInputPayloadTotal'), bytes, MAX_IMAGE_INPUT_PAYLOAD_BYTES)
 }
 
 export function assertMaskEditFileSize(label: string, bytes: number) {
@@ -98,7 +99,7 @@ export async function fetchImageUrlAsDataUrl(url: string, fallbackMime: string, 
   })
 
   if (!response.ok) {
-    throw new Error(`图片 URL 下载失败：HTTP ${response.status}`)
+    throw new Error(tCurrent('imageUrlDownloadFailed', { status: response.status }))
   }
 
   const blob = await response.blob()

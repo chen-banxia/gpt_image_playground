@@ -1,9 +1,13 @@
 import { useState } from 'react'
 import { useStore } from '../store'
 import { useVersionCheck } from '../hooks/useVersionCheck'
+import { useLanguage, useT } from '../hooks/useI18n'
 import HelpModal from './HelpModal'
 
 export default function Header() {
+  const language = useLanguage()
+  const t = useT()
+  const setSettings = useStore((s) => s.setSettings)
   const setShowSettings = useStore((s) => s.setShowSettings)
   const { hasUpdate, latestRelease, dismiss } = useVersionCheck()
   const [showHelp, setShowHelp] = useState(false)
@@ -20,7 +24,7 @@ export default function Header() {
                 rel="noopener noreferrer"
                 className="text-gray-800 transition-colors hover:text-gray-600 dark:text-gray-100 dark:hover:text-gray-300"
               >
-                灵绘
+                {t('appName')}
               </a>
             </h1>
             {hasUpdate && latestRelease && (
@@ -30,7 +34,7 @@ export default function Header() {
                 rel="noopener noreferrer"
                 onClick={dismiss}
                 className="mt-0.5 rounded border border-red-500/30 bg-red-500 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white transition-colors hover:bg-red-600 animate-fade-in"
-                title={`新版本 ${latestRelease.tag}`}
+                title={t('newVersion', { tag: latestRelease.tag })}
               >
                 NEW
               </a>
@@ -40,14 +44,14 @@ export default function Header() {
             href="https://colorflowai.com"
             target="_blank"
             rel="noopener noreferrer"
-            title="画图后端：在 colorflowai.com 注册账号，创建令牌后填入本网页设置中即可使用"
+            title={t('imageBackendTitle')}
             className="group hidden min-w-0 items-center gap-1.5 rounded-full border border-purple-200/70 bg-purple-50/80 px-2.5 py-1 text-xs text-gray-600 shadow-sm shadow-purple-900/5 transition hover:border-purple-300 hover:bg-purple-100/80 hover:text-gray-800 dark:border-purple-400/20 dark:bg-purple-400/10 dark:text-gray-300 dark:hover:bg-purple-400/15 dark:hover:text-gray-100 sm:inline-flex"
           >
             <svg className="h-3.5 w-3.5 flex-shrink-0 text-purple-500 dark:text-purple-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
             </svg>
-            <span className="hidden font-medium text-purple-700 dark:text-purple-300 md:inline">画图后端</span>
-            <span className="max-w-[32rem] truncate">注册获取令牌</span>
+            <span className="hidden font-medium text-purple-700 dark:text-purple-300 md:inline">{t('imageBackend')}</span>
+            <span className="max-w-[32rem] truncate">{t('imageBackendCta')}</span>
             <svg className="h-3.5 w-3.5 flex-shrink-0 text-purple-500 transition-transform group-hover:translate-x-0.5 dark:text-purple-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 17L17 7M9 7h8v8" />
             </svg>
@@ -56,22 +60,22 @@ export default function Header() {
             href="https://colorflowai.com"
             target="_blank"
             rel="noopener noreferrer"
-            title="画图后端：在 colorflowai.com 注册账号，创建令牌后填入本网页设置中即可使用"
+            title={t('imageBackendTitle')}
             className="inline-flex flex-shrink-0 items-center rounded-full border border-purple-200/70 bg-purple-50/80 px-2 py-1 text-[11px] font-medium text-purple-700 transition hover:bg-purple-100 dark:border-purple-400/20 dark:bg-purple-400/10 dark:text-purple-300 dark:hover:bg-purple-400/15 sm:hidden"
           >
-            画图后端
+            {t('imageBackend')}
           </a>
           <a
             href="https://aicodelink.top"
             target="_blank"
             rel="noopener noreferrer"
-            title="Code Link，一家稳定的海外大模型中转站，支持claude、gpt、gemini，只服务于海外用户！"
+            title={t('modelRelayTitle')}
             className="group hidden min-w-0 items-center gap-1.5 rounded-full border border-blue-200/70 bg-blue-50/80 px-2.5 py-1 text-xs text-gray-600 shadow-sm shadow-blue-900/5 transition hover:border-blue-300 hover:bg-blue-100/80 hover:text-gray-800 dark:border-blue-400/20 dark:bg-blue-400/10 dark:text-gray-300 dark:hover:bg-blue-400/15 dark:hover:text-gray-100 sm:inline-flex"
           >
             <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-emerald-500 shadow-[0_0_0_3px_rgba(16,185,129,0.16)]" />
-            <span className="hidden font-medium text-blue-700 dark:text-blue-300 md:inline">大模型中转站</span>
+            <span className="hidden font-medium text-blue-700 dark:text-blue-300 md:inline">{t('modelRelay')}</span>
             <span className="max-w-[32rem] truncate">
-              支持 claude / gpt / gemini
+              {t('modelRelayCta')}
             </span>
             <svg className="h-3.5 w-3.5 flex-shrink-0 text-blue-500 transition-transform group-hover:translate-x-0.5 dark:text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 17L17 7M9 7h8v8" />
@@ -81,17 +85,25 @@ export default function Header() {
             href="https://aicodelink.top"
             target="_blank"
             rel="noopener noreferrer"
-            title="Code Link，一家稳定的海外大模型中转站，支持claude、gpt、gemini，只服务于海外用户！"
+            title={t('modelRelayTitle')}
             className="inline-flex flex-shrink-0 items-center rounded-full border border-blue-200/70 bg-blue-50/80 px-2 py-1 text-[11px] font-medium text-blue-700 transition hover:bg-blue-100 dark:border-blue-400/20 dark:bg-blue-400/10 dark:text-blue-300 dark:hover:bg-blue-400/15 sm:hidden"
           >
-            中转站
+            {t('modelRelayMobile')}
           </a>
         </div>
         <div className="flex items-center gap-1">
           <button
+            onClick={() => setSettings({ language: language === 'en' ? 'zh' : 'en' })}
+            className="inline-flex h-9 items-center rounded-lg border border-gray-200 bg-white px-2.5 text-xs font-medium text-gray-600 transition hover:bg-gray-50 dark:border-white/[0.08] dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-white/[0.06]"
+            title={language === 'en' ? t('switchToChinese') : t('switchToEnglish')}
+            aria-label={t('language')}
+          >
+            {language === 'en' ? '中文' : 'EN'}
+          </button>
+          <button
             onClick={() => setShowHelp(true)}
             className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-900 transition-colors"
-            title="操作指南"
+            title={t('help')}
           >
             <svg
               className="w-5 h-5 text-gray-600 dark:text-gray-400"
@@ -110,7 +122,7 @@ export default function Header() {
           <button
             onClick={() => setShowSettings(true)}
             className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-900 transition-colors"
-            title="设置"
+            title={t('settings')}
           >
             <svg
               className="w-5 h-5 text-gray-600 dark:text-gray-400"

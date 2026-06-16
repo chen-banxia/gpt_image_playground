@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { TaskParams, TaskRecord } from '../types'
 import ViewportTooltip from '../components/ViewportTooltip'
+import { useT } from '../hooks/useI18n'
 
 type ParamKey = keyof TaskParams
 
@@ -18,6 +19,7 @@ interface ActualValueBadgeProps {
 }
 
 export function ActualValueBadge({ value, className = '', variant = 'highlight' }: ActualValueBadgeProps) {
+  const t = useT()
   const [tooltipVisible, setTooltipVisible] = useState(false)
   const touchTimerRef = useRef<number | null>(null)
   const colorClass = variant === 'normal'
@@ -57,7 +59,7 @@ export function ActualValueBadge({ value, className = '', variant = 'highlight' 
     >
       {value}
       <ViewportTooltip visible={tooltipVisible} className="whitespace-nowrap">
-        API 实际响应值
+        {t('apiActualValue')}
       </ViewportTooltip>
     </span>
   )

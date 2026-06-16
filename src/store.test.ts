@@ -91,13 +91,13 @@ describe('expired OpenAI running tasks', () => {
     expect(result.expiredTasks.map((item) => item.id)).toEqual(['legacy-running', 'openai-running'])
     expect(result.tasks.find((item) => item.id === 'legacy-running')).toMatchObject({
       status: 'error',
-      error: expect.stringContaining('请求超时'),
+      error: expect.stringContaining('Request timed out'),
       finishedAt: now,
       elapsed: 699_000,
     })
     expect(result.tasks.find((item) => item.id === 'openai-running')).toMatchObject({
       status: 'error',
-      error: expect.stringContaining('请求超时'),
+      error: expect.stringContaining('Request timed out'),
       finishedAt: now,
       elapsed: 698_000,
     })

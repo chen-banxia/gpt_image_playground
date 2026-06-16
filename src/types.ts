@@ -2,6 +2,7 @@
 
 export type ApiMode = 'images' | 'responses'
 export type ApiProvider = 'openai' | 'fal'
+export type Language = 'en' | 'zh'
 
 export interface ApiProfile {
   id: string
@@ -17,6 +18,7 @@ export interface ApiProfile {
 }
 
 export interface AppSettings {
+  language: Language
   /** 旧版单配置字段：保留用于导入/查询参数兼容，实际请求以 active profile 为准 */
   baseUrl: string
   apiKey: string

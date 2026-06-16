@@ -6,6 +6,8 @@ import { canvasToBlob, loadImage } from '../lib/canvasImage'
 import { storeImage } from '../lib/db'
 import { prepareMaskTargetDataUrl, replaceMaskTargetImage } from '../lib/maskPreprocess'
 import { useCloseOnEscape } from '../hooks/useCloseOnEscape'
+import { useT } from '../hooks/useI18n'
+import { tCurrent } from '../i18n'
 import {
   clampViewTransform,
   clientPointToCanvasPoint,
@@ -68,7 +70,7 @@ function firstTwoPointers(points: Map<number, Point>): [Point, Point] | null {
 
 function fillWhiteMask(canvas: HTMLCanvasElement) {
   const ctx = canvas.getContext('2d', { willReadFrequently: true })
-  if (!ctx) throw new Error('当前浏览器不支持 Canvas')
+  if (!ctx) throw new Error(tCurrent('canvasUnsupported'))
   ctx.globalCompositeOperation = 'source-over'
   ctx.clearRect(0, 0, canvas.width, canvas.height)
   ctx.fillStyle = '#fff'
@@ -79,11 +81,11 @@ function drawMaskImageToCanvas(maskImage: HTMLImageElement, maskCanvas: HTMLCanv
   const maskAspect = maskImage.naturalWidth / maskImage.naturalHeight
   const canvasAspect = maskCanvas.width / maskCanvas.height
   if (Math.abs(maskAspect - canvasAspect) > 0.001) {
-    throw new Error('遮罩尺寸与当前图片不一致')
+    throw new Error(tCurrent('maskSizeMismatchCurrent'))
   }
 
   const maskCtx = maskCanvas.getContext('2d', { willReadFrequently: true })
-  if (!maskCtx) throw new Error('当前浏览器不支持 Canvas')
+  if (!maskCtx) throw new Error(tCurrent('canvasUnsupported'))
   maskCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height)
   maskCtx.imageSmoothingEnabled = true
   maskCtx.imageSmoothingQuality = 'high'
@@ -94,12 +96,13 @@ function blobToDataUrl(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
     reader.onload = () => resolve(String(reader.result))
-    reader.onerror = () => reject(reader.error ?? new Error('图片导出失败'))
+    reader.onerror = () => reject(reader.error ?? new Error(tCurrent('imageExportFailed')))
     reader.readAsDataURL(blob)
   })
 }
 
 export default function MaskEditorModal() {
+  const t = useT()
   const imageId = useStore((s) => s.maskEditorImageId)
   const setMaskEditorImageId = useStore((s) => s.setMaskEditorImageId)
   const maskDraft = useStore((s) => s.maskDraft)
@@ -182,13 +185,13 @@ export default function MaskEditorModal() {
 
   const handleRemoveMask = () => {
     setConfirmDialog({
-      title: '移除遮罩',
-      message: '确定要撤销对这张图片的所有涂抹并移除遮罩吗？',
+      title: t('removeMask'),
+      message: t('removeMaskMessage'),
       tone: 'danger',
       action: () => {
         clearMaskDraft()
         setMaskEditorImageId(null)
-        showToast('已移除遮罩', 'success')
+        showToast(t('maskRemoved'), 'success')
       },
     })
   }
@@ -479,7 +482,7 @@ export default function MaskEditorModal() {
         const dataUrl = await ensureImageCached(targetImageId)
         if (cancelled) return
         if (!dataUrl) {
-          showToast('图片已不存在，无法编辑遮罩', 'error')
+          showToast(t('imageMissingCannotEditMask'), 'error')
           setMaskEditorImageId(null)
           return
         }
@@ -500,7 +503,7 @@ export default function MaskEditorModal() {
         }
 
         const imageCtx = imageCanvas.getContext('2d')
-        if (!imageCtx) throw new Error('当前浏览器不支持 Canvas')
+        if (!imageCtx) throw new Error(t('canvasUnsupported'))
         imageCtx.clearRect(0, 0, imageCanvas.width, imageCanvas.height)
         imageCtx.drawImage(image, 0, 0)
 
@@ -514,7 +517,7 @@ export default function MaskEditorModal() {
           } catch (err) {
             fillWhiteMask(maskCanvas)
             showToast(
-              `遮罩草稿加载失败，已重置为空白遮罩：${err instanceof Error ? err.message : String(err)}`,
+              t('maskDraftLoadFailed', { message: err instanceof Error ? err.message : String(err) }),
               'error',
             )
           }
@@ -525,7 +528,10 @@ export default function MaskEditorModal() {
         setSize(nextSize)
         if (preparedTarget.wasResized) {
           showToast(
-            `已为遮罩编辑按官方要求调整图片尺寸：\n${preparedTarget.originalWidth}×${preparedTarget.originalHeight} → ${preparedTarget.width}×${preparedTarget.height}`,
+            t('maskResizeNotice', {
+              from: `${preparedTarget.originalWidth}x${preparedTarget.originalHeight}`,
+              to: `${preparedTarget.width}x${preparedTarget.height}`,
+            }),
             'info',
           )
         }
@@ -809,7 +815,7 @@ export default function MaskEditorModal() {
         updatedAt: Date.now(),
       })
       setMaskEditorImageId(null)
-      showToast('遮罩已保存', 'success')
+      showToast(t('save'), 'success')
     } catch (err) {
       if (
         saveTokenRef.current !== token ||
@@ -843,11 +849,11 @@ export default function MaskEditorModal() {
       {/* Header */}
       <div className="flex-none flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-950 z-20">
         <div className="flex items-center gap-3">
-          <button onClick={close} disabled={isSaving} className="p-2 -ml-2 text-gray-500 hover:bg-gray-100 rounded-lg dark:text-gray-400 dark:hover:bg-gray-800 transition" title="取消">
+          <button onClick={close} disabled={isSaving} className="p-2 -ml-2 text-gray-500 hover:bg-gray-100 rounded-lg dark:text-gray-400 dark:hover:bg-gray-800 transition" title={t('cancel')}>
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>
           </button>
           <div className="relative flex items-center gap-1.5">
-            <h2 className="text-sm font-medium text-gray-700 dark:text-gray-200" id="mask-editor-title">编辑遮罩</h2>
+            <h2 className="text-sm font-medium text-gray-700 dark:text-gray-200" id="mask-editor-title">{t('maskEditorTitle')}</h2>
             <button
               type="button"
               onClick={showMaskInfoPopover}
@@ -857,8 +863,8 @@ export default function MaskEditorModal() {
               onTouchEnd={clearMaskInfoTimer}
               onTouchCancel={hideMaskInfoPopover}
               className="flex h-6 w-6 items-center justify-center rounded-full text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 dark:text-gray-500 dark:hover:bg-gray-800 dark:hover:text-gray-300"
-              aria-label="遮罩编辑说明"
-              title="遮罩编辑说明"
+              aria-label={t('maskInfo')}
+              title={t('maskInfo')}
             >
               <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -867,7 +873,7 @@ export default function MaskEditorModal() {
             {showMaskInfo && (
               <div className="absolute left-0 top-full mt-2 w-64 rounded-xl border border-gray-200/80 bg-white px-3 py-2 text-xs leading-5 text-gray-600 shadow-lg dark:border-white/[0.08] dark:bg-gray-900 dark:text-gray-300">
                 <div className="absolute -top-1.5 left-16 h-3 w-3 rotate-45 border-l border-t border-gray-200/80 bg-white dark:border-white/[0.08] dark:bg-gray-900" />
-                根据官方文档说明，此功能仅基于提示词，无法完全控制模型编辑区域
+                {t('maskInfoText')}
               </div>
             )}
           </div>
@@ -875,11 +881,11 @@ export default function MaskEditorModal() {
         <div className="flex items-center gap-2">
           {maskDraft?.targetImageId === imageId && (
             <button onClick={handleRemoveMask} className="flex h-8 items-center gap-1.5 px-4 text-sm font-medium text-white bg-red-500 hover:bg-red-600 rounded-lg transition">
-              移除遮罩
+              {t('removeMask')}
             </button>
           )}
           <button onClick={handleSave} disabled={!isReady || isSaving} className="flex h-8 items-center gap-1.5 px-4 text-sm font-medium text-white bg-blue-500 hover:bg-blue-600 rounded-lg disabled:opacity-50 transition">
-            {isSaving ? '保存中...' : '保存'}
+            {isSaving ? t('saving') : t('save')}
           </button>
         </div>
       </div>
@@ -888,7 +894,7 @@ export default function MaskEditorModal() {
       <div ref={stageRef} className="flex-1 relative flex items-center justify-center overflow-hidden bg-gray-100/50 dark:bg-black/50 p-0 pb-[76px] sm:p-6 sm:pb-[100px]" style={{ containerType: 'size' }}>
         {isLoading && (
           <div className="absolute inset-0 z-20 flex items-center justify-center bg-white/50 text-sm text-gray-500 backdrop-blur-sm dark:bg-gray-900/50 dark:text-gray-300">
-            正在载入图片...
+            {t('loadingImage')}
           </div>
         )}
         <div
@@ -935,7 +941,7 @@ export default function MaskEditorModal() {
                   className={`p-2 sm:p-2.5 rounded-lg sm:rounded-xl transition-all ${tool === 'brush' ? 'bg-white shadow-sm text-blue-500 dark:bg-[#323338] dark:text-blue-400 dark:shadow-none' : 'text-gray-500 hover:text-gray-700 dark:text-[#8a8a8e] dark:hover:text-gray-200'}`}
                   onClick={() => setTool('brush')}
                   disabled={!isReady || isSaving}
-                  title="画笔"
+                  title={t('brush')}
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
@@ -945,7 +951,7 @@ export default function MaskEditorModal() {
                   className={`p-2 sm:p-2.5 rounded-lg sm:rounded-xl transition-all ${tool === 'eraser' ? 'bg-white shadow-sm text-blue-500 dark:bg-[#323338] dark:text-blue-400 dark:shadow-none' : 'text-gray-500 hover:text-gray-700 dark:text-[#8a8a8e] dark:hover:text-gray-200'}`}
                   onClick={() => setTool('eraser')}
                   disabled={!isReady || isSaving}
-                  title="橡皮"
+                  title={t('eraser')}
                 >
                   <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <g transform="translate(0, 1) rotate(-45 12 12)">
@@ -963,7 +969,7 @@ export default function MaskEditorModal() {
                   onClick={toggleBrushControls}
                   className={`flex items-center justify-center w-10 h-10 sm:w-[46px] sm:h-[46px] rounded-xl sm:rounded-[14px] transition-all border ${showBrushControls ? 'bg-blue-50 border-blue-200 text-blue-600 dark:bg-[#323338] dark:border-gray-600 dark:text-blue-400' : 'bg-white border-gray-200/80 text-gray-700 hover:bg-gray-50 dark:bg-transparent dark:border-[#323338] dark:text-[#e0e0e0] dark:hover:border-gray-500'}`}
                   disabled={!isReady || isSaving}
-                  title="调节笔刷大小"
+                  title={t('brushSize')}
                 >
                   <span className="text-[14px] sm:text-[15px] font-semibold tracking-tight">{brushSize}</span>
                 </button>
@@ -971,20 +977,20 @@ export default function MaskEditorModal() {
             </div>
 
             <div className="flex items-center gap-0.5 sm:gap-2 sm:ml-1">
-              <button onClick={handleUndo} disabled={!canUndo} className="p-2 sm:p-2.5 text-gray-500 hover:bg-gray-100 rounded-lg sm:rounded-xl disabled:opacity-30 dark:text-[#8a8a8e] dark:hover:bg-white/10 dark:hover:text-gray-200 transition-all" title="撤销">
+              <button onClick={handleUndo} disabled={!canUndo} className="p-2 sm:p-2.5 text-gray-500 hover:bg-gray-100 rounded-lg sm:rounded-xl disabled:opacity-30 dark:text-[#8a8a8e] dark:hover:bg-white/10 dark:hover:text-gray-200 transition-all" title={t('undo')}>
                 <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M3 7v6h6" />
                   <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13" />
                 </svg>
               </button>
-              <button onClick={handleRedo} disabled={!canRedo} className="p-2 sm:p-2.5 text-gray-500 hover:bg-gray-100 rounded-lg sm:rounded-xl disabled:opacity-30 dark:text-[#8a8a8e] dark:hover:bg-white/10 dark:hover:text-gray-200 transition-all" title="重做">
+              <button onClick={handleRedo} disabled={!canRedo} className="p-2 sm:p-2.5 text-gray-500 hover:bg-gray-100 rounded-lg sm:rounded-xl disabled:opacity-30 dark:text-[#8a8a8e] dark:hover:bg-white/10 dark:hover:text-gray-200 transition-all" title={t('redo')}>
                 <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M21 7v6h-6" />
                   <path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 2.7" />
                 </svg>
               </button>
               <div className="w-px h-4 sm:h-5 bg-gray-300 dark:bg-[#323338] mx-1"></div>
-              <button onClick={resetViewTransform} disabled={!isReady || isSaving || !isZoomed} className="p-2 sm:p-2.5 text-gray-500 hover:bg-gray-100 rounded-lg sm:rounded-xl disabled:opacity-30 dark:text-[#8a8a8e] dark:hover:bg-white/10 dark:hover:text-gray-200 transition-all" title="重置视图">
+              <button onClick={resetViewTransform} disabled={!isReady || isSaving || !isZoomed} className="p-2 sm:p-2.5 text-gray-500 hover:bg-gray-100 rounded-lg sm:rounded-xl disabled:opacity-30 dark:text-[#8a8a8e] dark:hover:bg-white/10 dark:hover:text-gray-200 transition-all" title={t('resetView')}>
                 <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M4 14h6v6"/>
                   <path d="M20 10h-6V4"/>
@@ -992,7 +998,7 @@ export default function MaskEditorModal() {
                   <path d="M3 21l7-7"/>
                 </svg>
               </button>
-              <button onClick={handleClear} disabled={!isReady || isSaving} className="p-2 sm:p-2.5 text-gray-500 hover:bg-gray-100 rounded-lg sm:rounded-xl disabled:opacity-30 dark:text-[#8a8a8e] dark:hover:bg-white/10 dark:hover:text-gray-200 transition-all" title="清空遮罩">
+              <button onClick={handleClear} disabled={!isReady || isSaving} className="p-2 sm:p-2.5 text-gray-500 hover:bg-gray-100 rounded-lg sm:rounded-xl disabled:opacity-30 dark:text-[#8a8a8e] dark:hover:bg-white/10 dark:hover:text-gray-200 transition-all" title={t('clearMask')}>
                 <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M3 6h18"/>
                   <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>

@@ -1,8 +1,10 @@
 import React, { useEffect, useState, useRef } from 'react'
 import { useStore, addImageFromUrl } from '../store'
 import { copyBlobToClipboard, getClipboardFailureMessage } from '../lib/clipboard'
+import { useT } from '../hooks/useI18n'
 
 export default function ImageContextMenu() {
+  const t = useT()
   const [menuInfo, setMenuInfo] = useState<{ src: string; x: number; y: number } | null>(null)
   const showToast = useStore((s) => s.showToast)
   const inputImages = useStore((s) => s.inputImages)
@@ -77,10 +79,10 @@ export default function ImageContextMenu() {
       const res = await fetch(menuInfo.src)
       const blob = await res.blob()
       await copyBlobToClipboard(blob)
-      showToast('图片已复制', 'success')
+      showToast(t('imageCopied'), 'success')
     } catch (err) {
       console.error(err)
-      showToast(getClipboardFailureMessage('复制失败', err), 'error')
+      showToast(getClipboardFailureMessage(t('copyFailed'), err), 'error')
     }
   }
 
@@ -99,10 +101,10 @@ export default function ImageContextMenu() {
       a.click()
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
-      showToast('开始下载', 'success')
+      showToast(t('downloadStarted'), 'success')
     } catch (err) {
       console.error(err)
-      showToast('下载失败', 'error')
+      showToast(t('downloadFailed'), 'error')
     }
   }
 
@@ -110,7 +112,7 @@ export default function ImageContextMenu() {
     e.stopPropagation()
     setMenuInfo(null)
     if (inputImages.length >= 16) {
-      showToast('参考图数量已达上限（16 张），无法继续添加', 'error')
+      showToast(t('imageLimitReachedToast', { count: 16 }), 'error')
       return
     }
 
@@ -119,10 +121,10 @@ export default function ImageContextMenu() {
       setDetailTaskId(null)
       setLightboxImageId(null)
       setMaskEditorImageId(null)
-      showToast('已加入参考图', 'success')
+      showToast(t('addedToReferenceImages'), 'success')
     } catch (err) {
       console.error(err)
-      showToast(`加入参考图失败：${err instanceof Error ? err.message : String(err)}`, 'error')
+      showToast(t('addReferenceFailed', { message: err instanceof Error ? err.message : String(err) }), 'error')
     }
   }
 
@@ -153,7 +155,7 @@ export default function ImageContextMenu() {
         <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
         </svg>
-        复制
+        {t('copy')}
       </button>
       <button
         onClick={handleDownload}
@@ -162,7 +164,7 @@ export default function ImageContextMenu() {
         <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
         </svg>
-        下载
+        {t('download')}
       </button>
       <button
         onClick={handleEdit}
@@ -171,7 +173,7 @@ export default function ImageContextMenu() {
         <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
         </svg>
-        编辑
+        {t('edit')}
       </button>
     </div>
   )

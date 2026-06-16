@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import type { ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { useCloseOnEscape } from '../hooks/useCloseOnEscape'
+import { useT } from '../hooks/useI18n'
 
 interface HelpModalProps {
   onClose: () => void
@@ -33,6 +34,7 @@ function List({ children }: { children: ReactNode }) {
 }
 
 export default function HelpModal({ onClose }: HelpModalProps) {
+  const t = useT()
   const isMobile = useIsMobile()
   useCloseOnEscape(true, onClose)
 
@@ -54,12 +56,12 @@ export default function HelpModal({ onClose }: HelpModalProps) {
               <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
               <path d="M12 17h.01" />
             </svg>
-            操作指南
+            {t('help')}
           </h3>
           <button
             onClick={onClose}
             className="rounded-full p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-white/[0.06] dark:hover:text-gray-200"
-            aria-label="关闭"
+            aria-label={t('close')}
           >
             <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -69,65 +71,65 @@ export default function HelpModal({ onClose }: HelpModalProps) {
 
         <div className="flex-1 overflow-y-auto pr-1 custom-scrollbar">
           <div className="grid gap-4 md:grid-cols-2">
-            <Section title="首次使用">
+            <Section title={t('firstUse')}>
               <List>
-                <li>点击右上角设置按钮，输入 API Key 后即可开始生成。</li>
-                <li>API 地址和接口已由系统固定配置，页面不会要求填写 API URL。</li>
-                <li>默认不会记住 API Key；需要刷新后继续使用时，可在设置中开启“记住 API Key”。</li>
+                <li>{t('firstUse1')}</li>
+                <li>{t('firstUse2')}</li>
+                <li>{t('firstUse3')}</li>
               </List>
             </Section>
 
-            <Section title="文本生成图片">
+            <Section title={t('textToImage')}>
               <List>
-                <li>在底部输入框写入提示词，点击发送按钮或按 Ctrl+Enter 提交。</li>
-                <li>可在输入框上方调整尺寸、质量、格式、数量等参数。</li>
-                <li>生成完成后，图片会出现在历史记录中，可打开详情查看实际参数。</li>
+                <li>{t('textToImage1')}</li>
+                <li>{t('textToImage2')}</li>
+                <li>{t('textToImage3')}</li>
               </List>
             </Section>
 
-            <Section title="参考图与编辑">
+            <Section title={t('referenceEdit')}>
               <List>
-                <li>可以通过选择文件、粘贴图片或拖拽图片添加参考图。</li>
-                <li>添加参考图后提交，会进入图片编辑流程，让模型基于参考图生成结果。</li>
-                <li>在历史记录中可将某次输出再次加入输入区，继续迭代编辑。</li>
+                <li>{t('referenceEdit1')}</li>
+                <li>{t('referenceEdit2')}</li>
+                <li>{t('referenceEdit3')}</li>
               </List>
             </Section>
 
-            <Section title="遮罩编辑">
+            <Section title={t('maskEditing')}>
               <List>
-                <li>添加参考图后，可进入遮罩编辑，涂抹需要重绘的区域。</li>
-                <li>遮罩会随当前任务一起提交；如果遮罩覆盖整张图，提交前会二次确认。</li>
-                <li>遮罩任务完成后，当前遮罩会自动清理，避免误用于下一次生成。</li>
+                <li>{t('maskEditing1')}</li>
+                <li>{t('maskEditing2')}</li>
+                <li>{t('maskEditing3')}</li>
               </List>
             </Section>
 
-            <Section title="历史记录管理">
+            <Section title={t('historyManagement')}>
               <List>
-                <li>可搜索历史任务，也可以按状态或收藏筛选。</li>
-                <li>打开任务详情后，可以收藏、删除、复用配置、继续编辑输出图。</li>
+                <li>{t('historyManagement1')}</li>
+                <li>{t('historyManagement2')}</li>
                 <li>
                   {isMobile
-                    ? '移动端在记录卡片上左右滑动，可选中或取消选中记录。'
-                    : '桌面端可在空白处拖拽框选，也可按住 Ctrl 或 Command 点击卡片多选。'}
+                    ? t('historyManagementMobile')
+                    : t('historyManagementDesktop')}
                 </li>
-                <li>选中多条记录后，底部会出现批量收藏、批量删除和全选当前可见记录。</li>
+                <li>{t('historyManagement4')}</li>
               </List>
             </Section>
 
-            <Section title="数据保存与备份">
+            <Section title={t('dataBackup')}>
               <List>
-                <li>浏览器关闭或刷新页面不会自动清空任务和图片，它们会保存在当前浏览器本地 IndexedDB。</li>
-                <li>API Key 默认只保存在当前页面会话；开启“记住 API Key”后，才会保存到当前浏览器本地。</li>
-                <li>导出的备份 zip 不包含 API Key，导入到新浏览器后需要重新输入 Key。</li>
-                <li>清理浏览器站点数据、使用无痕模式、点击清空所有数据或删除记录，可能导致内容无法恢复。</li>
+                <li>{t('dataBackup1')}</li>
+                <li>{t('dataBackup2')}</li>
+                <li>{t('dataBackup3')}</li>
+                <li>{t('dataBackup4')}</li>
               </List>
             </Section>
 
-            <Section title="关于与隐私">
+            <Section title={t('privacy')}>
               <List>
-                <li>生成时会把提示词、参考图、遮罩和必要参数发送到系统配置的图片接口。</li>
-                <li>除图片生成请求外，应用不会主动上传历史记录、备份文件或 API Key。</li>
-                <li>页面使用本地存储保存任务数据；跨浏览器、跨设备不会自动同步。</li>
+                <li>{t('privacy1')}</li>
+                <li>{t('privacy2')}</li>
+                <li>{t('privacy3')}</li>
               </List>
             </Section>
           </div>
@@ -141,10 +143,10 @@ export default function HelpModal({ onClose }: HelpModalProps) {
               rel="noopener noreferrer"
               className="flex items-center gap-2 text-sm font-medium text-gray-500 transition-colors hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
             >
-              灵绘
+              {t('appName')}
             </a>
             <span className="text-center text-[11px] text-gray-400 dark:text-gray-500">
-              基于开源项目{' '}
+              {t('basedOnProject')}{' '}
               <a
                 href="https://github.com/CookSleep/gpt_image_playground"
                 target="_blank"
@@ -153,7 +155,7 @@ export default function HelpModal({ onClose }: HelpModalProps) {
               >
                 GPT Image Playground
               </a>
-              {' '}构建，感谢原作者的贡献
+              {' '}{t('originalAuthorThanks')}
             </span>
           </div>
         </div>

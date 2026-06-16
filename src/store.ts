@@ -29,6 +29,7 @@ import { validateMaskMatchesImage } from './lib/canvasImage'
 import { orderInputImagesForMask } from './lib/mask'
 import { getChangedParams, normalizeParamsForSettings } from './lib/paramCompatibility'
 import { zipSync, unzipSync, strToU8, strFromU8 } from 'fflate'
+import { translate, type TranslationKey } from './i18n'
 
 // ===== Image cache =====
 // 内存缓存，id → dataUrl，避免每次从 IndexedDB 读取
@@ -40,7 +41,11 @@ const openAIWatchdogTimers = new Map<string, ReturnType<typeof setTimeout>>()
 const executingTaskIds = new Set<string>()
 
 function createOpenAITimeoutError(timeoutSeconds: number) {
-  return `请求超时：超过 ${timeoutSeconds} 秒仍未完成，请稍后重试或提高超时时间。`
+  return tr('requestTimeoutError', { seconds: timeoutSeconds })
+}
+
+function tr(key: TranslationKey, replacements?: Record<string, string | number>) {
+  return translate(useStore.getState().settings.language, key, replacements)
 }
 
 export function getCachedImage(id: string): string | undefined {
@@ -430,21 +435,22 @@ function scheduleOpenAIWatchdog(taskId: string, timeoutSeconds: number) {
   const timer = setTimeout(() => {
     openAIWatchdogTimers.delete(taskId)
     const failed = failOpenAITaskIfStillRunning(taskId, createOpenAITimeoutError(timeoutSeconds))
-    if (failed) useStore.getState().showToast('OpenAI 任务请求超时', 'error')
+    if (failed) useStore.getState().showToast(tr('openAITaskTimeout'), 'error')
   }, remainingMs)
   openAIWatchdogTimers.set(taskId, timer)
 }
 
-export function showCodexCliPrompt(force = false, reason = '接口返回的提示词已被改写') {
+export function showCodexCliPrompt(force = false, reason?: string) {
   const state = useStore.getState()
   const settings = state.settings
   const promptKey = getCodexCliPromptKey(settings)
   if (!force && (settings.codexCli || state.dismissedCodexCliPrompts.includes(promptKey))) return
+  const displayReason = reason ?? translate(settings.language, 'promptRewrittenReason')
 
   state.setConfirmDialog({
-    title: '检测到 Codex CLI API',
-    message: `${reason}，当前 API 来源很可能是 Codex CLI。\n\n是否开启 Codex CLI 兼容模式？开启后会禁用在此处无效的质量参数，并在 Images API 多图生成时使用并发请求，解决该 API 数量参数无效的问题。同时，提示词文本开头会加入简短的不改写要求，避免模型重写提示词，偏离原意。`,
-    confirmText: '开启',
+    title: translate(settings.language, 'codexCliDetectedTitle'),
+    message: translate(settings.language, 'codexCliDetectedMessage', { reason: displayReason }),
+    confirmText: translate(settings.language, 'enable'),
     action: () => {
       const state = useStore.getState()
       state.dismissCodexCliPrompt(promptKey)
@@ -507,7 +513,7 @@ async function completeRecoveredFalTask(task: TaskRecord, result: Awaited<Return
     finishedAt: Date.now(),
     elapsed: Date.now() - task.createdAt,
   })
-  useStore.getState().showToast(`fal.ai 任务已恢复，共 ${outputIds.length} 张图片`, 'success')
+  useStore.getState().showToast(tr('falTaskRecovered', { count: outputIds.length }), 'success')
 }
 
 async function recoverFalTask(taskId: string) {
@@ -620,14 +626,15 @@ export async function submitTask(options: { allowFullMask?: boolean } = {}) {
     useStore.getState()
 
   const activeProfile = getActiveApiProfile(settings)
-  if (validateApiProfile(activeProfile)) {
-    showToast(`请先完善当前 Provider：${validateApiProfile(activeProfile)}`, 'error')
+  const validationError = validateApiProfile(activeProfile, settings.language)
+  if (validationError) {
+    showToast(tr('completeCurrentProvider', { reason: validationError }), 'error')
     useStore.getState().setShowSettings(true)
     return
   }
 
   if (!prompt.trim()) {
-    showToast('请输入提示词', 'error')
+    showToast(tr('enterPrompt'), 'error')
     return
   }
 
@@ -641,9 +648,9 @@ export async function submitTask(options: { allowFullMask?: boolean } = {}) {
       const coverage = await validateMaskMatchesImage(maskDraft.maskDataUrl, orderedInputImages[0].dataUrl)
       if (coverage === 'full' && !options.allowFullMask) {
         setConfirmDialog({
-          title: '确认编辑整张图片？',
-          message: '当前遮罩覆盖了整张图片，提交后可能会重绘全部内容。是否继续？',
-          confirmText: '继续提交',
+          title: tr('confirmFullImageEditTitle'),
+          message: tr('confirmFullImageEditMessage'),
+          confirmText: tr('continueSubmit'),
           tone: 'warning',
           action: () => {
             void submitTask({ allowFullMask: true })
@@ -730,13 +737,13 @@ async function executeTask(taskId: string) {
     const inputDataUrls: string[] = []
     for (const imgId of task.inputImageIds) {
       const dataUrl = await ensureImageCached(imgId)
-      if (!dataUrl) throw new Error('输入图片已不存在')
+      if (!dataUrl) throw new Error(tr('inputImageMissing'))
       inputDataUrls.push(dataUrl)
     }
     let maskDataUrl: string | undefined
     if (task.maskImageId) {
       maskDataUrl = await ensureImageCached(task.maskImageId)
-      if (!maskDataUrl) throw new Error('遮罩图片已不存在')
+      if (!maskDataUrl) throw new Error(tr('maskImageMissing'))
     }
 
     const result = await callImageApi({
@@ -784,7 +791,7 @@ async function executeTask(taskId: string) {
       if (promptWasRevised) {
         showCodexCliPrompt()
       } else if (!hasRevisedPromptValue) {
-        showCodexCliPrompt(false, '接口没有返回官方 API 会返回的部分信息')
+        showCodexCliPrompt(false, tr('missingOfficialApiInfoReason'))
       }
     }
 
@@ -803,7 +810,7 @@ async function executeTask(taskId: string) {
       falRecoverable: false,
     })
 
-    useStore.getState().showToast(`生成完成，共 ${outputIds.length} 张图片`, 'success')
+    useStore.getState().showToast(tr('generationComplete', { count: outputIds.length }), 'success')
     const currentMask = useStore.getState().maskDraft
     if (
       maskDataUrl &&
@@ -823,7 +830,7 @@ async function executeTask(taskId: string) {
     if (latestTask.apiProvider === 'fal' && latestFalRequestInfo && isFalConnectionRecoverableError(err)) {
       updateTaskInStore(taskId, {
         status: 'error',
-        error: '与 fal.ai 的连接已断开，连接恢复后会自动查询任务结果。',
+        error: tr('falConnectionRecovering'),
         falRequestId: latestFalRequestInfo.requestId,
         falEndpoint: latestFalRequestInfo.endpoint,
         falRecoverable: true,
@@ -921,7 +928,7 @@ export async function reuseConfig(task: TaskRecord) {
   } else {
     clearMaskDraft()
   }
-  showToast('已复用配置到输入框', 'success')
+  showToast(tr('reusedConfigToast'), 'success')
 }
 
 /** 编辑输出：将输出图加入输入 */
@@ -938,7 +945,7 @@ export async function editOutputs(task: TaskRecord) {
       added++
     }
   }
-  showToast(`已添加 ${added} 张输出图到输入`, 'success')
+  showToast(tr('addedOutputsToast', { count: added }), 'success')
 }
 
 /** 删除多条任务 */
@@ -988,7 +995,7 @@ export async function removeMultipleTasks(taskIds: string[]) {
     useStore.getState().setSelectedTaskIds(newSelection)
   }
 
-  showToast(`已删除 ${taskIds.length} 条记录`, 'success')
+  showToast(tr('deletedRecordsToast', { count: taskIds.length }), 'success')
 }
 
 /** 删除单条任务 */
@@ -1024,7 +1031,7 @@ export async function removeTask(task: TaskRecord) {
     }
   }
 
-  showToast('记录已删除', 'success')
+  showToast(tr('recordDeletedToast'), 'success')
 }
 
 /** 清空所有数据（含配置重置） */
@@ -1039,7 +1046,7 @@ export async function clearAllData() {
   clearMaskDraft()
   setSettings({ ...DEFAULT_SETTINGS })
   setParams({ ...DEFAULT_PARAMS })
-  showToast('所有数据已清空', 'success')
+  showToast(tr('allDataClearedToast'), 'success')
 }
 
 /** 从 dataUrl 解析出 MIME 扩展名和二进制数据 */
@@ -1114,12 +1121,12 @@ export async function exportData() {
     a.download = `gpt-image-playground-${Date.now()}.zip`
     a.click()
     URL.revokeObjectURL(url)
-    useStore.getState().showToast('数据已导出', 'success')
+    useStore.getState().showToast(tr('dataExportedToast'), 'success')
   } catch (e) {
     useStore
       .getState()
       .showToast(
-        `导出失败：${e instanceof Error ? e.message : String(e)}`,
+        tr('exportFailed', { message: e instanceof Error ? e.message : String(e) }),
         'error',
       )
   }
@@ -1132,10 +1139,10 @@ export async function importData(file: File): Promise<boolean> {
     const unzipped = unzipSync(new Uint8Array(buffer))
 
     const manifestBytes = unzipped['manifest.json']
-    if (!manifestBytes) throw new Error('ZIP 中缺少 manifest.json')
+    if (!manifestBytes) throw new Error(tr('zipMissingManifest'))
 
     const data: ExportData = JSON.parse(strFromU8(manifestBytes))
-    if (!data.tasks || !data.imageFiles) throw new Error('无效的数据格式')
+    if (!data.tasks || !data.imageFiles) throw new Error(tr('invalidDataFormat'))
 
     // 还原图片
     for (const [id, info] of Object.entries(data.imageFiles)) {
@@ -1159,13 +1166,13 @@ export async function importData(file: File): Promise<boolean> {
     useStore.getState().setTasks(tasks)
     useStore
       .getState()
-      .showToast(`已导入 ${data.tasks.length} 条记录`, 'success')
+      .showToast(tr('importedRecordsToast', { count: data.tasks.length }), 'success')
     return true
   } catch (e) {
     useStore
       .getState()
       .showToast(
-        `导入失败：${e instanceof Error ? e.message : String(e)}`,
+        tr('importFailed', { message: e instanceof Error ? e.message : String(e) }),
         'error',
       )
     return false
@@ -1185,7 +1192,7 @@ export async function addImageFromFile(file: File): Promise<void> {
 export async function addImageFromUrl(src: string): Promise<void> {
   const res = await fetch(src)
   const blob = await res.blob()
-  if (!blob.type.startsWith('image/')) throw new Error('不是有效的图片')
+  if (!blob.type.startsWith('image/')) throw new Error(tr('invalidImage'))
   const dataUrl = await blobToDataUrl(blob)
   const id = await storeImage(dataUrl, 'upload')
   imageCache.set(id, dataUrl)

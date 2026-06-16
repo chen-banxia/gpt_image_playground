@@ -1,3 +1,5 @@
+import { tCurrent } from '../i18n'
+
 export async function copyTextToClipboard(text: string) {
   let asyncClipboardError: unknown = null
 
@@ -27,7 +29,7 @@ export async function copyBlobToClipboard(blob: Blob) {
 
 export function getClipboardFailureMessage(fallback: string, err: unknown) {
   if (isEmbeddedPage() && isClipboardPermissionError(err)) {
-    return '复制失败：内嵌页面未授予剪贴板权限'
+    return tCurrent('clipboardEmbeddedDenied')
   }
 
   return fallback

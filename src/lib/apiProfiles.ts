@@ -1,4 +1,5 @@
-import type { ApiMode, ApiProfile, ApiProvider, AppSettings } from '../types'
+import type { ApiMode, ApiProfile, ApiProvider, AppSettings, Language } from '../types'
+import { translate } from '../i18n'
 import { readRuntimeEnv } from './runtimeEnv'
 
 const DEFAULT_BASE_URL = readRuntimeEnv(import.meta.env.VITE_DEFAULT_API_URL) || 'https://colorflowai.com/v1'
@@ -28,6 +29,10 @@ function readTimeout(value: unknown, fallback: number): number {
   return fallback
 }
 
+function readLanguage(value: unknown): Language {
+  return value === 'zh' ? 'zh' : 'en'
+}
+
 export function createDefaultOpenAIProfile(overrides: Partial<ApiProfile> = {}): ApiProfile {
   return {
     id: DEFAULT_OPENAI_PROFILE_ID,
@@ -47,7 +52,7 @@ export function createDefaultOpenAIProfile(overrides: Partial<ApiProfile> = {}):
 export function createDefaultFalProfile(overrides: Partial<ApiProfile> = {}): ApiProfile {
   return {
     id: `fal-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
-    name: '新配置',
+    name: 'New profile',
     provider: 'fal',
     baseUrl: DEFAULT_FAL_BASE_URL,
     apiKey: '',
@@ -124,6 +129,7 @@ export function normalizeSettings(input: Partial<AppSettings> | unknown): AppSet
   const active = profiles.find((p) => p.id === activeProfileId) ?? profiles[0]
 
   return {
+    language: readLanguage(record.language),
     baseUrl: active.baseUrl,
     apiKey: active.apiKey,
     rememberApiKey: typeof record.rememberApiKey === 'boolean' ? record.rememberApiKey : false,
@@ -159,11 +165,11 @@ export function getActiveApiProfile(settings: Partial<AppSettings> | unknown): A
   }
 }
 
-export function validateApiProfile(profile: ApiProfile): string | null {
-  if (!profile.name.trim()) return '缺少名称'
-  if (profile.provider === 'openai' && !profile.baseUrl.trim()) return '缺少 API URL'
-  if (!profile.apiKey.trim()) return '缺少 API Key'
-  if (!profile.model.trim()) return '缺少模型 ID'
+export function validateApiProfile(profile: ApiProfile, language: Language = 'en'): string | null {
+  if (!profile.name.trim()) return translate(language, 'missingName')
+  if (profile.provider === 'openai' && !profile.baseUrl.trim()) return translate(language, 'missingApiUrl')
+  if (!profile.apiKey.trim()) return translate(language, 'missingApiKey')
+  if (!profile.model.trim()) return translate(language, 'missingModelId')
   return null
 }
 
@@ -245,6 +251,7 @@ export function mergeImportedSettings(currentSettings: Partial<AppSettings> | un
 
 export const DEFAULT_SETTINGS: AppSettings = normalizeSettings({
   baseUrl: DEFAULT_BASE_URL,
+  language: 'en',
   apiKey: '',
   model: DEFAULT_IMAGES_MODEL,
   timeout: DEFAULT_API_TIMEOUT,

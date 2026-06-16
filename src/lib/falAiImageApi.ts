@@ -1,5 +1,6 @@
 import { fal } from '@fal-ai/client'
 import type { ApiProfile, FalApiResponse, TaskParams } from '../types'
+import { tCurrent } from '../i18n'
 import {
   assertImageInputPayloadSize,
   assertMaskEditFileSize,
@@ -91,7 +92,7 @@ async function parseFalImages(payload: FalApiResponse, fallbackMime: string, sig
     images.push(isHttpUrl(value) ? await fetchImageUrlAsDataUrl(value, fallbackMime, signal) : value)
   }
 
-  if (!images.length) throw new Error('fal.ai 未返回可用图片数据')
+  if (!images.length) throw new Error(tCurrent('falNoUsableImages'))
   return images
 }
 
@@ -150,8 +151,8 @@ export async function callFalAiImageApi(opts: CallApiOptions, profile: ApiProfil
 
   try {
     if (opts.maskDataUrl) {
-      assertMaskEditFileSize('遮罩主图文件', getDataUrlDecodedByteSize(opts.inputImageDataUrls[0] ?? ''))
-      assertMaskEditFileSize('遮罩文件', getDataUrlDecodedByteSize(opts.maskDataUrl))
+      assertMaskEditFileSize(tCurrent('maskSourceFile'), getDataUrlDecodedByteSize(opts.inputImageDataUrls[0] ?? ''))
+      assertMaskEditFileSize(tCurrent('maskFile'), getDataUrlDecodedByteSize(opts.maskDataUrl))
     }
     assertImageInputPayloadSize(
       opts.inputImageDataUrls.reduce((sum, dataUrl) => sum + getDataUrlEncodedByteSize(dataUrl), 0) +

@@ -3,8 +3,10 @@ import { useStore, exportData, importData, clearAllData } from '../store'
 import { getActiveApiProfile, normalizeSettings, DEFAULT_API_TIMEOUT } from '../lib/apiProfiles'
 import type { AppSettings } from '../types'
 import { useCloseOnEscape } from '../hooks/useCloseOnEscape'
+import { useT } from '../hooks/useI18n'
 
 export default function SettingsModal() {
+  const t = useT()
   const showSettings = useStore((s) => s.showSettings)
   const setShowSettings = useStore((s) => s.setShowSettings)
   const settings = useStore((s) => s.settings)
@@ -104,14 +106,14 @@ export default function SettingsModal() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
-            设置
+            {t('settings')}
           </h3>
           <div className="flex items-center gap-3">
             <span className="text-xs text-gray-400 dark:text-gray-500 font-mono select-none">v{__APP_VERSION__}</span>
             <button
               onClick={handleClose}
               className="rounded-full p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-white/[0.06] dark:hover:text-gray-200"
-              aria-label="关闭"
+              aria-label={t('close')}
             >
               <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -126,25 +128,25 @@ export default function SettingsModal() {
               <svg className="w-4 h-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6l4 2m6-2a10 10 0 11-20 0 10 10 0 0120 0z" />
               </svg>
-              习惯配置
+              {t('preferences')}
             </h4>
             <div className="space-y-4">
               <div className="block">
                 <div className="mb-1 flex items-center justify-between">
-                  <span className="block text-xs text-gray-500 dark:text-gray-400">提交任务后清空输入框</span>
+                  <span className="block text-xs text-gray-500 dark:text-gray-400">{t('clearInputAfterSubmit')}</span>
                   <button
                     type="button"
                     onClick={() => commitSettings({ ...draft, clearInputAfterSubmit: !draft.clearInputAfterSubmit })}
                     className={`relative inline-flex h-3.5 w-6 items-center rounded-full transition-colors ${draft.clearInputAfterSubmit ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-600'}`}
                     role="switch"
                     aria-checked={draft.clearInputAfterSubmit}
-                    aria-label="提交任务后清空输入框"
+                    aria-label={t('clearInputAfterSubmit')}
                   >
                     <span className={`inline-block h-2.5 w-2.5 transform rounded-full bg-white shadow transition-transform ${draft.clearInputAfterSubmit ? 'translate-x-[11px]' : 'translate-x-[2px]'}`} />
                   </button>
                 </div>
                 <div data-selectable-text className="text-[10px] text-gray-400 dark:text-gray-500">
-                  开启后，提交成功创建任务时会清空提示词和参考图。
+                  {t('clearInputAfterSubmitHint')}
                 </div>
               </div>
             </div>
@@ -155,7 +157,7 @@ export default function SettingsModal() {
               <svg className="w-4 h-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
               </svg>
-              API 配置
+              {t('apiConfig')}
             </h4>
 
             <div className="space-y-4">
@@ -192,31 +194,31 @@ export default function SettingsModal() {
                   </button>
                 </div>
                 <div data-selectable-text className="mt-1 text-[10px] text-gray-400 dark:text-gray-500">
-                  支持通过查询参数覆盖：<code className="bg-gray-100 dark:bg-white/[0.06] px-1 py-0.5 rounded">?apiKey=</code>
+                  {t('queryApiKeyHint')}<code className="bg-gray-100 dark:bg-white/[0.06] px-1 py-0.5 rounded">?apiKey=</code>
                 </div>
               </div>
 
               <div className="block">
                 <div className="mb-1 flex items-center justify-between">
-                  <span className="block text-xs text-gray-500 dark:text-gray-400">记住 API Key</span>
+                  <span className="block text-xs text-gray-500 dark:text-gray-400">{t('rememberApiKey')}</span>
                   <button
                     type="button"
                     onClick={() => commitSettings({ ...draft, rememberApiKey: !draft.rememberApiKey })}
                     className={`relative inline-flex h-3.5 w-6 items-center rounded-full transition-colors ${draft.rememberApiKey ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-600'}`}
                     role="switch"
                     aria-checked={draft.rememberApiKey}
-                    aria-label="记住 API Key"
+                    aria-label={t('rememberApiKey')}
                   >
                     <span className={`inline-block h-2.5 w-2.5 transform rounded-full bg-white shadow transition-transform ${draft.rememberApiKey ? 'translate-x-[11px]' : 'translate-x-[2px]'}`} />
                   </button>
                 </div>
                 <div data-selectable-text className="text-[10px] text-gray-400 dark:text-gray-500">
-                  默认不记住；开启后会保存到当前浏览器本地，方便刷新后继续使用。
+                  {t('rememberApiKeyHint')}
                 </div>
               </div>
 
               <div className="block">
-                <span className="block text-xs text-gray-500 dark:text-gray-400 mb-1">请求超时时间（秒）</span>
+                <span className="block text-xs text-gray-500 dark:text-gray-400 mb-1">{t('requestTimeoutSeconds')}</span>
                 <input
                   value={timeoutInput}
                   onChange={(e) => setTimeoutInput(e.target.value)}
@@ -232,7 +234,7 @@ export default function SettingsModal() {
                   className="w-full rounded-xl border border-gray-200/70 bg-white/60 px-3 py-2 text-sm text-gray-700 outline-none transition focus:border-blue-300 dark:border-white/[0.08] dark:bg-white/[0.03] dark:text-gray-200 dark:focus:border-blue-500/50"
                 />
                 <div data-selectable-text className="mt-1 text-[10px] text-gray-400 dark:text-gray-500">
-                  画图请求超过该时间未完成则中止。默认 {DEFAULT_API_TIMEOUT} 秒（10 分钟），仅作用于当前配置。
+                  {t('requestTimeoutHint', { seconds: DEFAULT_API_TIMEOUT })}
                 </div>
               </div>
             </div>
@@ -243,7 +245,7 @@ export default function SettingsModal() {
               <svg className="w-4 h-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
               </svg>
-              数据管理
+              {t('dataManagement')}
             </h4>
             <div className="space-y-3">
               <div className="flex gap-2">
@@ -254,7 +256,7 @@ export default function SettingsModal() {
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
-                  导出
+                  {t('export')}
                 </button>
                 <button
                   onClick={() => importInputRef.current?.click()}
@@ -263,7 +265,7 @@ export default function SettingsModal() {
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                   </svg>
-                  导入
+                  {t('import')}
                 </button>
                 <input
                   ref={importInputRef}
@@ -276,14 +278,14 @@ export default function SettingsModal() {
               <button
                 onClick={() =>
                   setConfirmDialog({
-                    title: '清空所有数据',
-                    message: '确定要清空所有任务记录、图片数据和供应商配置吗？此操作不可恢复。',
+                    title: t('clearAllDataTitle'),
+                    message: t('clearAllDataMessage'),
                     action: () => handleClearAllData(),
                   })
                 }
                 className="w-full rounded-xl border border-red-200/80 bg-red-50/50 px-4 py-2.5 text-sm text-red-500 transition hover:bg-red-100/80 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-400 dark:hover:bg-red-500/20"
               >
-                清空所有数据
+                {t('clearAllData')}
               </button>
             </div>
           </section>

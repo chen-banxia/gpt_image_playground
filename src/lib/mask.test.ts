@@ -34,7 +34,7 @@ describe('orderInputImagesForMask', () => {
   })
 
   it('throws when the target image is not present', () => {
-    expect(() => orderInputImagesForMask([img('a')], 'missing')).toThrow('遮罩主图已不存在')
+    expect(() => orderInputImagesForMask([img('a')], 'missing')).toThrow('Mask source image no longer exists')
   })
 })
 
@@ -44,7 +44,7 @@ describe('validateMaskTarget', () => {
   })
 
   it('throws for an empty target id', () => {
-    expect(() => validateMaskTarget([img('a')], '')).toThrow('遮罩主图已不存在')
+    expect(() => validateMaskTarget([img('a')], '')).toThrow('Mask source image no longer exists')
   })
 })
 
@@ -64,7 +64,7 @@ describe('classifyMaskAlpha', () => {
 
 describe('assertUsableMaskCoverage', () => {
   it('rejects masks with no edit area', () => {
-    expect(() => assertUsableMaskCoverage('empty')).toThrow('请先涂抹需要编辑的区域')
+    expect(() => assertUsableMaskCoverage('empty')).toThrow('Paint the area to edit first')
   })
 
   it('allows partial masks', () => {

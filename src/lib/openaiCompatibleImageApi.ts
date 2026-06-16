@@ -1,4 +1,5 @@
 import type { ApiProfile, ImageApiResponse, ResponsesApiResponse, TaskParams } from '../types'
+import { tCurrent } from '../i18n'
 import { dataUrlToBlob, imageDataUrlToPngBlob, maskDataUrlToPngBlob } from './canvasImage'
 import { buildApiUrl, isApiProxyAvailable, readClientDevProxyConfig } from './devProxy'
 import {
@@ -83,7 +84,7 @@ function parseResponsesImageResults(payload: ResponsesApiResponse, fallbackMime:
 }> {
   const output = payload.output
   if (!Array.isArray(output) || !output.length) {
-    throw new Error('接口未返回图片数据')
+    throw new Error(tCurrent('apiNoImageData'))
   }
 
   const results: Array<{ image: string; actualParams?: Partial<TaskParams>; revisedPrompt?: string }> = []
@@ -102,7 +103,7 @@ function parseResponsesImageResults(payload: ResponsesApiResponse, fallbackMime:
   }
 
   if (!results.length) {
-    throw new Error('接口未返回可用图片数据')
+    throw new Error(tCurrent('apiNoUsableImageData'))
   }
 
   return results
@@ -136,7 +137,7 @@ async function callImagesApiConcurrent(opts: CallApiOptions, profile: ApiProfile
   if (successfulResults.length === 0) {
     const firstError = results.find((r): r is PromiseRejectedResult => r.status === 'rejected')
     if (firstError) throw firstError.reason
-    throw new Error('所有并发请求均失败')
+    throw new Error(tCurrent('allConcurrentRequestsFailed'))
   }
 
   const images = successfulResults.flatMap((r) => r.images)
@@ -197,8 +198,8 @@ async function callImagesApiSingle(opts: CallApiOptions, profile: ApiProfile): P
 
     const maskBlob = opts.maskDataUrl ? await maskDataUrlToPngBlob(opts.maskDataUrl) : null
     if (opts.maskDataUrl) {
-      assertMaskEditFileSize('遮罩主图文件', imageBlobs[0]?.size ?? 0)
-      assertMaskEditFileSize('遮罩文件', maskBlob?.size ?? 0)
+      assertMaskEditFileSize(tCurrent('maskSourceFile'), imageBlobs[0]?.size ?? 0)
+      assertMaskEditFileSize(tCurrent('maskFile'), maskBlob?.size ?? 0)
     }
     assertImageInputPayloadSize(
       imageBlobs.reduce((sum, blob) => sum + blob.size, 0) + (maskBlob?.size ?? 0),
@@ -258,7 +259,7 @@ async function callImagesApiSingle(opts: CallApiOptions, profile: ApiProfile): P
   const payload = await response.json() as ImageApiResponse
   const data = payload.data
   if (!Array.isArray(data) || !data.length) {
-    throw new Error('接口未返回图片数据')
+    throw new Error(tCurrent('apiNoImageData'))
   }
 
   const images: string[] = []
@@ -278,7 +279,7 @@ async function callImagesApiSingle(opts: CallApiOptions, profile: ApiProfile): P
   }
 
   if (!images.length) {
-    throw new Error('接口未返回可用图片数据')
+    throw new Error(tCurrent('apiNoUsableImageData'))
   }
 
   const actualParams = mergeActualParams(
@@ -308,7 +309,7 @@ async function callResponsesImageApi(opts: CallApiOptions, profile: ApiProfile):
   if (successfulResults.length === 0) {
     const firstError = results.find((r): r is PromiseRejectedResult => r.status === 'rejected')
     if (firstError) throw firstError.reason
-    throw new Error('所有并发请求均失败')
+    throw new Error(tCurrent('allConcurrentRequestsFailed'))
   }
 
   const images = successfulResults.flatMap((r) => r.images)
@@ -333,8 +334,8 @@ async function callResponsesImageApiSingle(opts: CallApiOptions, profile: ApiPro
   const useApiProxy = profile.apiProxy && isApiProxyAvailable(proxyConfig)
   const requestHeaders = createRequestHeaders(profile)
   if (opts.maskDataUrl) {
-    assertMaskEditFileSize('遮罩主图文件', getDataUrlDecodedByteSize(inputImageDataUrls[0] ?? ''))
-    assertMaskEditFileSize('遮罩文件', getDataUrlDecodedByteSize(opts.maskDataUrl))
+    assertMaskEditFileSize(tCurrent('maskSourceFile'), getDataUrlDecodedByteSize(inputImageDataUrls[0] ?? ''))
+    assertMaskEditFileSize(tCurrent('maskFile'), getDataUrlDecodedByteSize(opts.maskDataUrl))
   }
   assertImageInputPayloadSize(
     inputImageDataUrls.reduce((sum, dataUrl) => sum + getDataUrlEncodedByteSize(dataUrl), 0) +
