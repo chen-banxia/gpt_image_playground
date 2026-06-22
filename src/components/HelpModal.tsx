@@ -137,14 +137,14 @@ export default function HelpModal({ onClose }: HelpModalProps) {
 
         <div className="mt-5 border-t border-gray-200 pt-4 dark:border-white/[0.08]">
           <div className="flex flex-col items-center gap-1.5">
-            <a
+           {/* <a
               href="https://aicodelink.top/"
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-2 text-sm font-medium text-gray-500 transition-colors hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
             >
               {t('appName')}
-            </a>
+            </a>*/}
             <span className="text-center text-[11px] text-gray-400 dark:text-gray-500">
               {t('basedOnProject')}{' '}
               <a

@@ -19,7 +19,7 @@ export default function Header() {
           <div className="flex flex-shrink-0 items-start gap-1">
             <h1 className="text-lg font-bold tracking-tight">
               <a
-                href="https://aicodelink.top/"
+                href="https://colorflowai.com"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-gray-800 transition-colors hover:text-gray-600 dark:text-gray-100 dark:hover:text-gray-300"
@@ -65,7 +65,7 @@ export default function Header() {
           >
             {t('imageBackend')}
           </a>
-          <a
+{/*          <a
             href="https://aicodelink.top"
             target="_blank"
             rel="noopener noreferrer"
@@ -80,8 +80,8 @@ export default function Header() {
             <svg className="h-3.5 w-3.5 flex-shrink-0 text-blue-500 transition-transform group-hover:translate-x-0.5 dark:text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 17L17 7M9 7h8v8" />
             </svg>
-          </a>
-          <a
+          </a>*/}
+        {/*  <a
             href="https://aicodelink.top"
             target="_blank"
             rel="noopener noreferrer"
@@ -89,17 +89,17 @@ export default function Header() {
             className="inline-flex flex-shrink-0 items-center rounded-full border border-blue-200/70 bg-blue-50/80 px-2 py-1 text-[11px] font-medium text-blue-700 transition hover:bg-blue-100 dark:border-blue-400/20 dark:bg-blue-400/10 dark:text-blue-300 dark:hover:bg-blue-400/15 sm:hidden"
           >
             {t('modelRelayMobile')}
-          </a>
+          </a>*/}
         </div>
         <div className="flex items-center gap-1">
-          <button
+{/*          <button
             onClick={() => setSettings({ language: language === 'en' ? 'zh' : 'en' })}
             className="inline-flex h-9 items-center rounded-lg border border-gray-200 bg-white px-2.5 text-xs font-medium text-gray-600 transition hover:bg-gray-50 dark:border-white/[0.08] dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-white/[0.06]"
             title={language === 'en' ? t('switchToChinese') : t('switchToEnglish')}
             aria-label={t('language')}
           >
             {language === 'en' ? '中文' : 'EN'}
-          </button>
+          </button>*/}
           <button
             onClick={() => setShowHelp(true)}
             className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-900 transition-colors"
