@@ -10,7 +10,7 @@ import type {
   ExportData,
 } from './types'
 import { DEFAULT_PARAMS } from './types'
-import { DEFAULT_SETTINGS, getActiveApiProfile, mergeImportedSettings, normalizeSettings, validateApiProfile } from './lib/apiProfiles'
+import { DEFAULT_SETTINGS, getActiveApiProfile, mergeImportedSettings, migrateLegacyDefaultImagesModel, normalizeSettings, validateApiProfile } from './lib/apiProfiles'
 import {
   getAllTasks,
   putTask,
@@ -304,6 +304,12 @@ export const useStore = create<AppState>()(
     }),
     {
       name: 'gpt-image-playground',
+      version: 1,
+      migrate: (persistedState, version) => {
+        const state = (persistedState ?? {}) as Record<string, unknown>
+        if (version >= 1) return state as never
+        return { ...state, settings: migrateLegacyDefaultImagesModel(state.settings) } as never
+      },
       partialize: (state) => {
         const shouldRememberApiKey = state.settings.rememberApiKey
         const sanitizedSettings: AppSettings = shouldRememberApiKey
@@ -387,8 +393,9 @@ export function markExpiredOpenAIRunningTasks(tasks: TaskRecord[], settings: App
     if (!isRunningOpenAITask(task)) return task
 
     const timeoutSeconds = getOpenAITaskProfile(settings, task)?.timeout ?? DEFAULT_SETTINGS.timeout
+    const attemptElapsed = Math.max(0, now - (task.attemptStartedAt ?? task.createdAt))
+    if (attemptElapsed < timeoutSeconds * 1000) return task
     const elapsed = Math.max(0, now - task.createdAt)
-    if (elapsed < timeoutSeconds * 1000) return task
 
     const updated: TaskRecord = {
       ...task,
@@ -425,18 +432,20 @@ function failOpenAITaskIfStillRunning(taskId: string, error: string, now = Date.
   return true
 }
 
-function scheduleOpenAIWatchdog(taskId: string, timeoutSeconds: number) {
+function scheduleOpenAIWatchdog(taskId: string, timeoutSeconds: number, onTimeout?: () => void) {
   clearOpenAIWatchdogTimer(taskId)
   const task = useStore.getState().tasks.find((item) => item.id === taskId)
   if (!task || !isRunningOpenAITask(task)) return
 
   const timeoutMs = Math.max(0, timeoutSeconds * 1000)
-  const remainingMs = Math.max(0, timeoutMs - (Date.now() - task.createdAt))
   const timer = setTimeout(() => {
     openAIWatchdogTimers.delete(taskId)
     const failed = failOpenAITaskIfStillRunning(taskId, createOpenAITimeoutError(timeoutSeconds))
-    if (failed) useStore.getState().showToast(tr('openAITaskTimeout'), 'error')
-  }, remainingMs)
+    if (failed) {
+      onTimeout?.()
+      useStore.getState().showToast(tr('openAITaskTimeout'), 'error')
+    }
+  }, timeoutMs)
   openAIWatchdogTimers.set(taskId, timer)
 }
 
@@ -570,7 +579,7 @@ export async function initStore() {
   const { tasks, expiredTasks } = markExpiredOpenAIRunningTasks(storedTasks, settings)
   await Promise.all(expiredTasks.map((task) => putTask(task)))
   useStore.getState().setTasks(tasks)
-  const openAITasksToResume: string[] = []
+  const openAITasksToResubmit: string[] = []
   for (const task of tasks) {
     if (
       task.apiProvider === 'fal' &&
@@ -580,9 +589,7 @@ export async function initStore() {
     ) {
       scheduleFalRecovery(task.id, 0)
     } else if (isRunningOpenAITask(task)) {
-      const profile = getOpenAITaskProfile(settings, task)
-      scheduleOpenAIWatchdog(task.id, profile?.timeout ?? DEFAULT_SETTINGS.timeout)
-      openAITasksToResume.push(task.id)
+      openAITasksToResubmit.push(task.id)
     }
   }
 
@@ -615,8 +622,14 @@ export async function initStore() {
     useStore.getState().setInputImages(restoredInputImages)
   }
 
-  for (const taskId of openAITasksToResume) {
+  for (const taskId of openAITasksToResubmit) {
     executeTask(taskId)
+  }
+  if (openAITasksToResubmit.length > 0) {
+    useStore.getState().showToast(
+      tr('openAITasksResubmittedAfterReload', { count: openAITasksToResubmit.length }),
+      'info',
+    )
   }
 }
 
@@ -715,22 +728,22 @@ export async function submitTask(options: { allowFullMask?: boolean } = {}) {
 
 async function executeTask(taskId: string) {
   if (executingTaskIds.has(taskId)) return
+  executingTaskIds.add(taskId)
+
   const { settings } = useStore.getState()
   const task = useStore.getState().tasks.find((t) => t.id === taskId)
-  if (!task) return
-  if (task.status !== 'running') return
-  executingTaskIds.add(taskId)
+  if (!task || task.status !== 'running') {
+    executingTaskIds.delete(taskId)
+    return
+  }
   const taskProfile = getTaskApiProfile(settings, task)
   const taskSettings = taskProfile ? activateProfileForTask(settings, taskProfile) : settings
   const activeProfile = taskProfile ?? getActiveApiProfile(settings)
   const taskProvider = task.apiProvider ?? activeProfile.provider
+  const openAIAbortController = taskProvider === 'openai' ? new AbortController() : null
   let falRequestInfo: { requestId: string; endpoint: string } | null = task.falRequestId && task.falEndpoint
     ? { requestId: task.falRequestId, endpoint: task.falEndpoint }
     : null
-
-  if (taskProvider === 'openai') {
-    scheduleOpenAIWatchdog(taskId, activeProfile.timeout)
-  }
 
   try {
     // 获取输入图片 data URLs
@@ -746,12 +759,20 @@ async function executeTask(taskId: string) {
       if (!maskDataUrl) throw new Error(tr('maskImageMissing'))
     }
 
+    if (taskProvider === 'openai') {
+      updateTaskInStore(taskId, { attemptStartedAt: Date.now() })
+      scheduleOpenAIWatchdog(taskId, activeProfile.timeout, () => {
+        openAIAbortController?.abort(new Error(createOpenAITimeoutError(activeProfile.timeout)))
+      })
+    }
+
     const result = await callImageApi({
       settings: taskSettings,
       prompt: task.prompt,
       params: task.params,
       inputImageDataUrls: inputDataUrls,
       maskDataUrl,
+      signal: openAIAbortController?.signal,
       onFalRequestEnqueued: (request) => {
         falRequestInfo = request
         updateTaskInStore(taskId, {
@@ -761,6 +782,7 @@ async function executeTask(taskId: string) {
         })
       },
     })
+    clearOpenAIWatchdogTimer(taskId)
 
     const latestBeforeSuccess = useStore.getState().tasks.find((t) => t.id === taskId)
     if (!latestBeforeSuccess || latestBeforeSuccess.status !== 'running') return
@@ -839,9 +861,13 @@ async function executeTask(taskId: string) {
       })
       scheduleFalRecovery(taskId)
     } else {
+      const rawError = err instanceof Error ? err.message : String(err)
+      const error = taskProvider === 'openai' && isFalConnectionRecoverableError(err)
+        ? tr('openAIConnectionLost', { message: rawError })
+        : rawError
       updateTaskInStore(taskId, {
         status: 'error',
-        error: err instanceof Error ? err.message : String(err),
+        error,
         falRecoverable: false,
         finishedAt: Date.now(),
         elapsed: Date.now() - task.createdAt,

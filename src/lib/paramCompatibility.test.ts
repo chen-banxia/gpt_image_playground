@@ -11,6 +11,12 @@ describe('parameter compatibility', () => {
     expect(normalizeParamsForSettings({ ...DEFAULT_PARAMS, n: 12 }, settings).n).toBe(10)
   })
 
+  it('keeps the chosen quality for OpenAI profiles', () => {
+    const settings = normalizeSettings(DEFAULT_SETTINGS)
+
+    expect(normalizeParamsForSettings({ ...DEFAULT_PARAMS, quality: 'high' }, settings).quality).toBe('high')
+  })
+
   it('limits fal.ai output count to 4', () => {
     const falProfile = createDefaultFalProfile({ apiKey: 'fal-key' })
     const settings = normalizeSettings({

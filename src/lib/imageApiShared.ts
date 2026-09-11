@@ -9,6 +9,7 @@ export const MIME_MAP: Record<string, string> = {
 
 export const MAX_MASK_EDIT_FILE_BYTES = 50 * 1024 * 1024
 export const MAX_IMAGE_INPUT_PAYLOAD_BYTES = 512 * 1024 * 1024
+const IMAGE_DOWNLOAD_RETRY_DELAYS_MS = [0, 500, 1500]
 
 export interface CallApiOptions {
   settings: AppSettings
@@ -17,6 +18,7 @@ export interface CallApiOptions {
   /** 输入图片的 data URL 列表 */
   inputImageDataUrls: string[]
   maskDataUrl?: string
+  signal?: AbortSignal
   onFalRequestEnqueued?: (request: { requestId: string; endpoint: string }) => void
 }
 
@@ -93,17 +95,35 @@ async function blobToDataUrl(blob: Blob, fallbackMime: string): Promise<string> 
 export async function fetchImageUrlAsDataUrl(url: string, fallbackMime: string, signal?: AbortSignal): Promise<string> {
   if (isDataUrl(url)) return url
 
-  const response = await fetch(url, {
-    cache: 'no-store',
-    signal,
-  })
+  let lastError: unknown
+  for (let attempt = 0; attempt < IMAGE_DOWNLOAD_RETRY_DELAYS_MS.length; attempt++) {
+    const delayMs = IMAGE_DOWNLOAD_RETRY_DELAYS_MS[attempt]
+    if (delayMs > 0) await new Promise((resolve) => setTimeout(resolve, delayMs))
+    if (signal?.aborted) throw signal.reason ?? new DOMException('Aborted', 'AbortError')
 
-  if (!response.ok) {
-    throw new Error(tCurrent('imageUrlDownloadFailed', { status: response.status }))
+    let response: Response
+    try {
+      response = await fetch(url, {
+        cache: 'no-store',
+        signal,
+      })
+    } catch (error) {
+      lastError = error
+      if (signal?.aborted) throw error
+      continue
+    }
+
+    if (response.ok) {
+      const blob = await response.blob()
+      return blobToDataUrl(blob, fallbackMime)
+    }
+
+    const error = new Error(tCurrent('imageUrlDownloadFailed', { status: response.status }))
+    lastError = error
+    if (![408, 425, 429, 500, 502, 503, 504].includes(response.status)) throw error
   }
 
-  const blob = await response.blob()
-  return blobToDataUrl(blob, fallbackMime)
+  throw lastError instanceof Error ? lastError : new Error(String(lastError))
 }
 
 export async function getApiErrorMessage(response: Response): Promise<string> {

@@ -3,12 +3,13 @@ import { translate } from '../i18n'
 import { readRuntimeEnv } from './runtimeEnv'
 
 const DEFAULT_BASE_URL = readRuntimeEnv(import.meta.env.VITE_DEFAULT_API_URL) || 'https://colorflowai.com/v1'
-export const DEFAULT_IMAGES_MODEL = 'gpt-image-2'
+export const DEFAULT_IMAGES_MODEL = 'gpt-image-2.5-flare'
 export const DEFAULT_RESPONSES_MODEL = 'gpt-5.5'
 export const DEFAULT_FAL_BASE_URL = 'https://fal.run'
 export const DEFAULT_FAL_MODEL = 'openai/gpt-image-2'
 export const DEFAULT_OPENAI_PROFILE_ID = 'default-openai'
 export const DEFAULT_API_TIMEOUT = 600
+export const MAX_API_TIMEOUT = 600
 
 /**
  * 历史上默认超时时间曾被设为 200 秒（commit 87faea8），后又调回 600 秒。
@@ -24,9 +25,9 @@ function migrateLegacyTimeout(value: number): number {
 
 function readTimeout(value: unknown, fallback: number): number {
   if (typeof value === 'number' && Number.isFinite(value)) {
-    return migrateLegacyTimeout(value)
+    return Math.min(MAX_API_TIMEOUT, Math.max(1, migrateLegacyTimeout(value)))
   }
-  return fallback
+  return Math.min(MAX_API_TIMEOUT, Math.max(1, fallback))
 }
 
 function readLanguage(value: unknown): Language {
@@ -142,6 +143,25 @@ export function normalizeSettings(input: Partial<AppSettings> | unknown): AppSet
     profiles,
     activeProfileId,
   }
+}
+
+/**
+ * 模型选择器加入前，默认模型固化为 gpt-image-2 并被写进了 localStorage。
+ * 存量配置里的该值只是旧默认值（当时界面上无从选择），一次性迁移到当前默认模型。
+ * 迁移只在 persist 版本升级时执行一次，之后用户在下拉里主动选回 gpt-image-2 不会再被改动。
+ */
+const LEGACY_DEFAULT_IMAGES_MODEL = 'gpt-image-2'
+
+export function migrateLegacyDefaultImagesModel(settings: Partial<AppSettings> | unknown): AppSettings {
+  const normalized = normalizeSettings(settings)
+  return normalizeSettings({
+    ...normalized,
+    profiles: normalized.profiles.map((profile) =>
+      profile.provider === 'openai' && profile.model === LEGACY_DEFAULT_IMAGES_MODEL
+        ? { ...profile, model: DEFAULT_IMAGES_MODEL }
+        : profile,
+    ),
+  })
 }
 
 export function getActiveApiProfile(settings: Partial<AppSettings> | unknown): ApiProfile {

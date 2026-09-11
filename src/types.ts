@@ -103,6 +103,8 @@ export interface TaskRecord {
   status: TaskStatus
   error: string | null
   createdAt: number
+  /** 当前一次同步 API 调用的开始时间；刷新后重新提交时会更新 */
+  attemptStartedAt?: number
   finishedAt: number | null
   /** 总耗时毫秒 */
   elapsed: number | null

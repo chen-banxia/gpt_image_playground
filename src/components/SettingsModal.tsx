@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useStore, exportData, importData, clearAllData } from '../store'
-import { getActiveApiProfile, normalizeSettings, DEFAULT_API_TIMEOUT } from '../lib/apiProfiles'
+import { getActiveApiProfile, normalizeSettings, DEFAULT_API_TIMEOUT, MAX_API_TIMEOUT } from '../lib/apiProfiles'
 import type { AppSettings } from '../types'
 import { useCloseOnEscape } from '../hooks/useCloseOnEscape'
 import { useT } from '../hooks/useI18n'
@@ -54,7 +54,9 @@ export default function SettingsModal() {
 
   const commitTimeoutInput = (raw: string) => {
     const parsed = Math.round(Number(raw))
-    const next = Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_API_TIMEOUT
+    const next = Number.isFinite(parsed) && parsed > 0
+      ? Math.min(parsed, MAX_API_TIMEOUT)
+      : DEFAULT_API_TIMEOUT
     setTimeoutInput(String(next))
     const nextDraft: AppSettings = {
       ...draft,
@@ -228,6 +230,7 @@ export default function SettingsModal() {
                   }}
                   type="number"
                   min={1}
+                  max={MAX_API_TIMEOUT}
                   step={1}
                   inputMode="numeric"
                   placeholder={String(DEFAULT_API_TIMEOUT)}

@@ -19,10 +19,6 @@ export function normalizeParamsForSettings(params: TaskParams, settings: AppSett
     n: Math.min(outputImageLimit, Math.max(1, params.n || DEFAULT_PARAMS.n)),
   }
 
-  if (activeProfile.provider === 'openai' && activeProfile.codexCli) {
-    nextParams.quality = DEFAULT_PARAMS.quality
-  }
-
   if (activeProfile.provider === 'fal') {
     if (nextParams.size === 'auto') nextParams.size = DEFAULT_FAL_IMAGE_SIZE
     if (nextParams.quality === 'auto') nextParams.quality = 'high'

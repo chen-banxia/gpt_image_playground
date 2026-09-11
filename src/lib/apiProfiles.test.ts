@@ -8,6 +8,7 @@ import {
   DEFAULT_SETTINGS,
   getActiveApiProfile,
   mergeImportedSettings,
+  migrateLegacyDefaultImagesModel,
   normalizeApiProfile,
   normalizeSettings,
 } from './apiProfiles'
@@ -244,6 +245,17 @@ describe('legacy timeout migration', () => {
     expect(profile.timeout).toBe(300)
   })
 
+  it('clamps timeouts above the new-api maximum to 600 seconds', () => {
+    const profile = normalizeApiProfile({
+      provider: 'openai',
+      apiKey: 'k',
+      model: DEFAULT_IMAGES_MODEL,
+      timeout: 900,
+    })
+
+    expect(profile.timeout).toBe(DEFAULT_API_TIMEOUT)
+  })
+
   it('migrates the legacy timeout through normalizeSettings (legacy single-profile shape)', () => {
     const settings = normalizeSettings({
       apiKey: 'k',
@@ -262,5 +274,35 @@ describe('legacy timeout migration', () => {
     })
 
     expect(profile.timeout).toBe(DEFAULT_API_TIMEOUT)
+  })
+})
+
+describe('migrateLegacyDefaultImagesModel', () => {
+  it('moves OpenAI profiles still pinned to the legacy default model onto the current default', () => {
+    const migrated = migrateLegacyDefaultImagesModel({
+      apiKey: 'k',
+      model: 'gpt-image-2',
+    })
+
+    expect(migrated.model).toBe(DEFAULT_IMAGES_MODEL)
+    expect(migrated.profiles[0].model).toBe(DEFAULT_IMAGES_MODEL)
+  })
+
+  it('keeps an explicitly chosen model untouched', () => {
+    const migrated = migrateLegacyDefaultImagesModel({
+      apiKey: 'k',
+      model: 'gpt-image-2.5-sunburst',
+    })
+
+    expect(migrated.model).toBe('gpt-image-2.5-sunburst')
+  })
+
+  it('leaves fal profiles alone', () => {
+    const migrated = migrateLegacyDefaultImagesModel({
+      profiles: [{ id: 'fal-1', name: 'fal', provider: 'fal', model: 'gpt-image-2' }],
+      activeProfileId: 'fal-1',
+    })
+
+    expect(migrated.profiles[0].model).toBe('gpt-image-2')
   })
 })

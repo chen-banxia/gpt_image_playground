@@ -105,4 +105,22 @@ describe('expired OpenAI running tasks', () => {
     expect(result.tasks.find((item) => item.id === 'fal-running')).toEqual(falRunning)
     expect(result.tasks.find((item) => item.id === 'done-task')).toEqual(doneTask)
   })
+
+  it('uses the latest resubmission attempt when checking the 600-second timeout', () => {
+    const now = 700_000
+    const resubmitted = task({
+      id: 'resubmitted',
+      apiProvider: 'openai',
+      status: 'running',
+      createdAt: 1_000,
+      attemptStartedAt: 650_000,
+      finishedAt: null,
+      elapsed: null,
+    })
+
+    const result = markExpiredOpenAIRunningTasks([resubmitted], DEFAULT_SETTINGS, now)
+
+    expect(result.expiredTasks).toEqual([])
+    expect(result.tasks[0]).toEqual(resubmitted)
+  })
 })

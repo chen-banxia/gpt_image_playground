@@ -3,6 +3,8 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 interface Option {
   label: string
   value: string | number
+  /** 下拉项里展示在标题下方的一句话说明 */
+  description?: string
 }
 
 interface SelectProps {
@@ -11,9 +13,12 @@ interface SelectProps {
   options: Option[]
   disabled?: boolean
   className?: string
+  /** 下拉面板的宽度等样式，默认与触发器同宽 */
+  menuClassName?: string
+  title?: string
 }
 
-export default function Select({ value, onChange, options, disabled, className }: SelectProps) {
+export default function Select({ value, onChange, options, disabled, className, menuClassName, title }: SelectProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [openUp, setOpenUp] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -51,6 +56,7 @@ export default function Select({ value, onChange, options, disabled, className }
       <div
         ref={triggerRef}
         onClick={handleToggle}
+        title={title}
         className={`flex items-center justify-between gap-1 w-full cursor-pointer select-none ${className ?? ''} ${
           disabled ? '!opacity-50 !cursor-not-allowed !bg-gray-100/50 dark:!bg-white/[0.05]' : ''
         }`}
@@ -68,9 +74,9 @@ export default function Select({ value, onChange, options, disabled, className }
 
       {isOpen && (
         <div
-          className={`absolute z-50 w-full bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl border border-gray-200/60 dark:border-white/[0.08] rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.3)] overflow-hidden py-1 max-h-60 overflow-y-auto ring-1 ring-black/5 dark:ring-white/10 ${
-            openUp ? 'bottom-full mb-1.5 animate-dropdown-up' : 'top-full mt-1.5 animate-dropdown-down'
-          }`}
+          className={`absolute z-50 bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl border border-gray-200/60 dark:border-white/[0.08] rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.3)] overflow-hidden py-1 max-h-60 overflow-y-auto ring-1 ring-black/5 dark:ring-white/10 ${
+            menuClassName ?? 'w-full'
+          } ${openUp ? 'bottom-full mb-1.5 animate-dropdown-up' : 'top-full mt-1.5 animate-dropdown-down'}`}
         >
           {options.map((option) => (
             <div
@@ -85,7 +91,18 @@ export default function Select({ value, onChange, options, disabled, className }
                   : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/[0.06]'
               }`}
             >
-              {option.label}
+              <div className="truncate">{option.label}</div>
+              {option.description && (
+                <div
+                  className={`mt-0.5 text-[10px] font-normal leading-snug ${
+                    option.value === value
+                      ? 'text-blue-500/80 dark:text-blue-400/70'
+                      : 'text-gray-400 dark:text-gray-500'
+                  }`}
+                >
+                  {option.description}
+                </div>
+              )}
             </div>
           ))}
         </div>

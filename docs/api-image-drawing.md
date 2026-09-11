@@ -143,7 +143,7 @@ interface TaskParams {
 - OpenAI provider 最多 `n=10`。
 - `size` 如果是 `宽x高` 会被规整到 16 的倍数，并限制边长、像素数和宽高比。
 - `output_format='png'` 时，`output_compression` 会被清空为 `null`。
-- Codex 兼容模式下，`quality` 会被固定回 `auto`，实际请求中也不会发送 `quality`。
+- `quality` 由用户自由选择，任何模式下都会照原样发送。
 
 ### 2.5 输入图片和大小限制
 
@@ -215,7 +215,7 @@ Authorization: Bearer <apiKey>
 | `size` | string | 是 | 可为 `auto` 或 `1024x1024` 这类尺寸。 |
 | `output_format` | string | 是 | `png`、`jpeg`、`webp`。 |
 | `moderation` | string | 是 | `auto` 或 `low`。 |
-| `quality` | string | 网页端有，Codex 无 | `auto`、`low`、`medium`、`high`。 |
+| `quality` | string | 是 | `auto`、`low`、`medium`、`high`。所有模式都会发送。 |
 | `output_compression` | number | 条件 | 仅当 `output_format !== 'png'` 且不为 `null` 时发送。 |
 | `n` | number | 条件 | 仅当 `n > 1` 时发送。 |
 
@@ -258,7 +258,7 @@ Content-Type: multipart/form-data; boundary=...
 | `size` | string | 是 | 输出尺寸。 |
 | `output_format` | string | 是 | `png`、`jpeg`、`webp`。 |
 | `moderation` | string | 是 | `auto` 或 `low`。 |
-| `quality` | string | 网页端有，Codex 无 | Codex 兼容模式不发送。 |
+| `quality` | string | 是 | `auto`、`low`、`medium`、`high`。所有模式都会发送。 |
 | `output_compression` | string | 条件 | 非 PNG 且不为 `null` 时发送字符串。 |
 | `n` | string | 条件 | `n > 1` 时发送字符串。 |
 | `image[]` | File | 是 | 每张输入图一个 `image[]` 字段。文件名为 `input-1.png` 等。 |
@@ -358,9 +358,9 @@ Use the following text as the complete prompt. Do not rewrite it:
 }
 ```
 
-### 4.2 不发送 quality
+### 4.2 quality 照常发送
 
-Codex 兼容模式下，`quality` 不会被发送：
+Codex 兼容模式不再改动 `quality`，用户在界面上选的值会原样发送。两种模式只在 prompt 前缀上不同：
 
 网页端标准请求：
 
@@ -383,7 +383,8 @@ Codex 请求：
   "prompt": "Use the following text as the complete prompt. Do not rewrite it:\nprompt",
   "size": "1024x1024",
   "output_format": "png",
-  "moderation": "auto"
+  "moderation": "auto",
+  "quality": "high"
 }
 ```
 
@@ -473,20 +474,15 @@ inputImageDataUrls.length === 0
       "type": "image_generation",
       "action": "generate",
       "size": "1024x1024",
-      "output_format": "png"
+      "output_format": "png",
+      "quality": "auto"
     }
   ],
   "tool_choice": "required"
 }
 ```
 
-如果不是 Codex 兼容模式，工具对象会额外发送：
-
-```json
-{
-  "quality": "auto"
-}
-```
+`quality` 始终随工具对象一起发送，与 Codex 兼容模式无关。
 
 如果 `output_format !== 'png'` 且 `output_compression != null`：
 
@@ -788,6 +784,6 @@ Authorization: Bearer <key>
 
 - 如果图片接口返回 URL，确保浏览器能直接下载该 URL，否则前端转换 data URL 会失败。
 - 如果接入 Codex 后端，建议返回顶层或单图级别的 `size`、`quality`、`output_format`，方便前端展示“实际参数”。
-- 如果后端不支持 `quality`，应使用 Codex 兼容模式，或保证前端不要发送该字段。
+- `quality` 现在始终发送，后端需要能接受 `auto`、`low`、`medium`、`high`（不支持的值建议忽略而不是报错）。
 - 如果后端不支持一次多图的 `n`，使用 Codex 兼容模式或 Responses API 模式，前端会自动拆成并发单图。
 - 如果遇到 CORS，开发环境可启用 `dev-proxy.config.json`；部署环境可用 Docker/Nginx 的 `/api-proxy`。

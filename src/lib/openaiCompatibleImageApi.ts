@@ -32,7 +32,6 @@ function createRequestHeaders(profile: ApiProfile): Record<string, string> {
 function createResponsesImageTool(
   params: TaskParams,
   isEdit: boolean,
-  profile: ApiProfile,
   maskDataUrl?: string,
 ): Record<string, unknown> {
   const tool: Record<string, unknown> = {
@@ -40,10 +39,7 @@ function createResponsesImageTool(
     action: isEdit ? 'edit' : 'generate',
     size: params.size,
     output_format: params.output_format,
-  }
-
-  if (!profile.codexCli) {
-    tool.quality = params.quality
+    quality: params.quality,
   }
 
   if (params.output_format !== 'png' && params.output_compression != null) {
@@ -125,7 +121,7 @@ async function callImagesApi(opts: CallApiOptions, profile: ApiProfile): Promise
 }
 
 async function callImagesApiConcurrent(opts: CallApiOptions, profile: ApiProfile, n: number): Promise<CallApiResult> {
-  const singleOpts = { ...opts, params: { ...opts.params, n: 1, quality: 'auto' as const } }
+  const singleOpts = { ...opts, params: { ...opts.params, n: 1 } }
   const results = await Promise.allSettled(
     Array.from({ length: n }).map(() => callImagesApiSingle(singleOpts, profile)),
   )
@@ -175,10 +171,7 @@ async function callImagesApiSingle(opts: CallApiOptions, profile: ApiProfile): P
     formData.append('size', params.size)
     formData.append('output_format', params.output_format)
     formData.append('moderation', params.moderation)
-
-    if (!profile.codexCli) {
-      formData.append('quality', params.quality)
-    }
+    formData.append('quality', params.quality)
 
     if (params.output_format !== 'png' && params.output_compression != null) {
       formData.append('output_compression', String(params.output_compression))
@@ -220,6 +213,7 @@ async function callImagesApiSingle(opts: CallApiOptions, profile: ApiProfile): P
       headers: requestHeaders,
       cache: 'no-store',
       body: formData,
+      signal: opts.signal,
     })
   } else {
     const body: Record<string, unknown> = {
@@ -228,10 +222,7 @@ async function callImagesApiSingle(opts: CallApiOptions, profile: ApiProfile): P
       size: params.size,
       output_format: params.output_format,
       moderation: params.moderation,
-    }
-
-    if (!profile.codexCli) {
-      body.quality = params.quality
+      quality: params.quality,
     }
 
     if (params.output_format !== 'png' && params.output_compression != null) {
@@ -249,6 +240,7 @@ async function callImagesApiSingle(opts: CallApiOptions, profile: ApiProfile): P
       },
       cache: 'no-store',
       body: JSON.stringify(body),
+      signal: opts.signal,
     })
   }
 
@@ -273,7 +265,7 @@ async function callImagesApiSingle(opts: CallApiOptions, profile: ApiProfile): P
     }
 
     if (isHttpUrl(item.url) || isDataUrl(item.url)) {
-      images.push(await fetchImageUrlAsDataUrl(item.url, mime))
+      images.push(await fetchImageUrlAsDataUrl(item.url, mime, opts.signal))
       revisedPrompts.push(typeof item.revised_prompt === 'string' ? item.revised_prompt : undefined)
     }
   }
@@ -345,7 +337,7 @@ async function callResponsesImageApiSingle(opts: CallApiOptions, profile: ApiPro
   const body = {
     model: profile.model,
     input: createResponsesInput(prompt, inputImageDataUrls),
-    tools: [createResponsesImageTool(params, inputImageDataUrls.length > 0, profile, opts.maskDataUrl)],
+    tools: [createResponsesImageTool(params, inputImageDataUrls.length > 0, opts.maskDataUrl)],
     tool_choice: 'required',
   }
 
@@ -357,6 +349,7 @@ async function callResponsesImageApiSingle(opts: CallApiOptions, profile: ApiPro
     },
     cache: 'no-store',
     body: JSON.stringify(body),
+    signal: opts.signal,
   })
 
   if (!response.ok) {
