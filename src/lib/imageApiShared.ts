@@ -19,6 +19,7 @@ export interface CallApiOptions {
   inputImageDataUrls: string[]
   maskDataUrl?: string
   signal?: AbortSignal
+  onPartialImage?: (image: string, requestIndex: number) => void
   onFalRequestEnqueued?: (request: { requestId: string; endpoint: string }) => void
 }
 
@@ -42,7 +43,12 @@ export function isDataUrl(value: unknown): value is string {
 }
 
 export function normalizeBase64Image(value: string, fallbackMime: string): string {
-  return value.startsWith('data:') ? value : `data:${fallbackMime};base64,${value}`
+  if (value.startsWith('data:')) return value
+  // 部分反代忽略 output_format；以文件签名确定 MIME，避免把 PNG 当作 JPEG 保存。
+  const mime = value.startsWith('iVBORw0KGgo') ? 'image/png'
+    : value.startsWith('/9j/') ? 'image/jpeg'
+      : value.startsWith('UklGR') ? 'image/webp' : fallbackMime
+  return `data:${mime};base64,${value}`
 }
 
 function formatMiB(bytes: number): string {
@@ -150,8 +156,9 @@ export function pickActualParams(source: unknown): Partial<TaskParams> {
   const record = source as Record<string, unknown>
   const actualParams: Partial<TaskParams> = {}
 
+  if (record.background === 'transparent' || record.background === 'opaque' || record.background === 'auto') actualParams.background = record.background
   if (typeof record.size === 'string') actualParams.size = record.size
-  if (record.quality === 'auto' || record.quality === 'low' || record.quality === 'medium' || record.quality === 'high') {
+  if (record.quality === 'auto' || record.quality === 'low' || record.quality === 'medium' || record.quality === 'high' || record.quality === 'xhigh' || record.quality === 'max') {
     actualParams.quality = record.quality
   }
   if (record.output_format === 'png' || record.output_format === 'jpeg' || record.output_format === 'webp') {

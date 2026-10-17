@@ -3,7 +3,7 @@ import { translate } from '../i18n'
 import { readRuntimeEnv } from './runtimeEnv'
 
 const DEFAULT_BASE_URL = readRuntimeEnv(import.meta.env.VITE_DEFAULT_API_URL) || 'https://colorflowai.com/v1'
-export const DEFAULT_IMAGES_MODEL = 'gpt-image-2.5-flare'
+export const DEFAULT_IMAGES_MODEL = 'gpt-image-2.5-sunburst'
 export const DEFAULT_RESPONSES_MODEL = 'gpt-5.5'
 export const DEFAULT_FAL_BASE_URL = 'https://fal.run'
 export const DEFAULT_FAL_MODEL = 'openai/gpt-image-2'
@@ -42,6 +42,7 @@ export function createDefaultOpenAIProfile(overrides: Partial<ApiProfile> = {}):
     baseUrl: DEFAULT_BASE_URL,
     apiKey: '',
     model: DEFAULT_IMAGES_MODEL,
+    imageGenerationModel: DEFAULT_IMAGES_MODEL,
     timeout: DEFAULT_API_TIMEOUT,
     apiMode: 'images',
     codexCli: false,
@@ -84,6 +85,7 @@ export function switchApiProfileProvider(profile: ApiProfile, provider: ApiProvi
     provider,
     baseUrl: DEFAULT_BASE_URL,
     model: DEFAULT_IMAGES_MODEL,
+    imageGenerationModel: DEFAULT_IMAGES_MODEL,
   }
 }
 
@@ -103,6 +105,7 @@ export function normalizeApiProfile(input: unknown, fallback?: Partial<ApiProfil
       : typeof record.baseUrl === 'string' ? record.baseUrl : defaults.baseUrl,
     apiKey: typeof record.apiKey === 'string' ? record.apiKey : defaults.apiKey,
     model: typeof record.model === 'string' && record.model.trim() ? record.model : defaults.model,
+    imageGenerationModel: typeof record.imageGenerationModel === 'string' ? record.imageGenerationModel.trim() : defaults.imageGenerationModel ?? DEFAULT_IMAGES_MODEL,
     timeout: readTimeout(record.timeout, defaults.timeout),
     apiMode,
     codexCli: provider === 'openai' ? true : Boolean(record.codexCli),
@@ -116,6 +119,7 @@ export function normalizeSettings(input: Partial<AppSettings> | unknown): AppSet
     baseUrl: DEFAULT_BASE_URL,
     apiKey: typeof record.apiKey === 'string' ? record.apiKey : '',
     model: typeof record.model === 'string' && record.model.trim() ? record.model : DEFAULT_IMAGES_MODEL,
+    imageGenerationModel: typeof record.imageGenerationModel === 'string' ? record.imageGenerationModel : DEFAULT_IMAGES_MODEL,
     timeout: readTimeout(record.timeout, DEFAULT_API_TIMEOUT),
     apiMode: record.apiMode === 'responses' ? 'responses' : 'images',
     codexCli: Boolean(record.codexCli),
@@ -135,6 +139,7 @@ export function normalizeSettings(input: Partial<AppSettings> | unknown): AppSet
     apiKey: active.apiKey,
     rememberApiKey: typeof record.rememberApiKey === 'boolean' ? record.rememberApiKey : false,
     model: active.model,
+    imageGenerationModel: active.imageGenerationModel,
     timeout: active.timeout,
     apiMode: active.apiMode,
     codexCli: active.codexCli,
@@ -176,6 +181,7 @@ export function getActiveApiProfile(settings: Partial<AppSettings> | unknown): A
       : typeof record.baseUrl === 'string' ? record.baseUrl : profile.baseUrl,
     apiKey: typeof record.apiKey === 'string' ? record.apiKey : profile.apiKey,
     model: typeof record.model === 'string' && record.model.trim() ? record.model : profile.model,
+    imageGenerationModel: typeof record.imageGenerationModel === 'string' ? record.imageGenerationModel : profile.imageGenerationModel,
     timeout: readTimeout(record.timeout, profile.timeout),
     apiMode: record.apiMode === 'images' || record.apiMode === 'responses' ? record.apiMode : profile.apiMode,
     codexCli: profile.provider === 'openai'
@@ -200,6 +206,7 @@ function isDefaultOpenAIProfile(profile: ApiProfile): boolean {
     profile.baseUrl === DEFAULT_BASE_URL &&
     profile.apiKey === '' &&
     profile.model === DEFAULT_IMAGES_MODEL &&
+    profile.imageGenerationModel === DEFAULT_IMAGES_MODEL &&
     profile.timeout === DEFAULT_API_TIMEOUT &&
     profile.apiMode === 'images' &&
     profile.apiProxy === false
@@ -226,6 +233,7 @@ function getApiProfileDedupKey(profile: ApiProfile): string {
     profile.baseUrl.trim().replace(/\/+$/, '').toLowerCase(),
     profile.apiKey.trim(),
     profile.model.trim(),
+    profile.imageGenerationModel?.trim(),
     profile.apiMode,
   ])
 }

@@ -1,5 +1,6 @@
 import type { ApiProfile, ImageApiResponse, ResponsesApiResponse, TaskParams } from '../types'
 import { tCurrent } from '../i18n'
+import { readImageStream } from './imageStream'
 import { dataUrlToBlob, imageDataUrlToPngBlob, maskDataUrlToPngBlob } from './canvasImage'
 import { buildApiUrl, isApiProxyAvailable, readClientDevProxyConfig } from './devProxy'
 import {
@@ -33,6 +34,7 @@ function createResponsesImageTool(
   params: TaskParams,
   isEdit: boolean,
   maskDataUrl?: string,
+  imageModel?: string,
 ): Record<string, unknown> {
   const tool: Record<string, unknown> = {
     type: 'image_generation',
@@ -40,7 +42,11 @@ function createResponsesImageTool(
     size: params.size,
     output_format: params.output_format,
     quality: params.quality,
+    moderation: params.moderation,
   }
+  if (imageModel) tool.model = imageModel
+  if (params.transparent_output && params.transparent_method !== 'local') tool.background = 'transparent'
+  if (params.stream) tool.partial_images = 2
 
   if (params.output_format !== 'png' && params.output_compression != null) {
     tool.output_compression = params.output_compression
@@ -91,7 +97,7 @@ function parseResponsesImageResults(payload: ResponsesApiResponse, fallbackMime:
     const result = item.result
     if (typeof result === 'string' && result.trim()) {
       results.push({
-        image: normalizeBase64Image(result, fallbackMime),
+        image: normalizeBase64Image(result, MIME_MAP[item.output_format ?? ''] || fallbackMime),
         actualParams: mergeActualParams(pickActualParams(item)),
         revisedPrompt: typeof item.revised_prompt === 'string' ? item.revised_prompt : undefined,
       })
@@ -113,7 +119,7 @@ export async function callOpenAICompatibleImageApi(opts: CallApiOptions, profile
 
 async function callImagesApi(opts: CallApiOptions, profile: ApiProfile): Promise<CallApiResult> {
   const n = opts.params.n > 0 ? opts.params.n : 1
-  if (profile.codexCli && n > 1) {
+  if ((profile.codexCli || opts.params.stream) && n > 1) {
     return callImagesApiConcurrent(opts, profile, n)
   }
 
@@ -123,7 +129,7 @@ async function callImagesApi(opts: CallApiOptions, profile: ApiProfile): Promise
 async function callImagesApiConcurrent(opts: CallApiOptions, profile: ApiProfile, n: number): Promise<CallApiResult> {
   const singleOpts = { ...opts, params: { ...opts.params, n: 1 } }
   const results = await Promise.allSettled(
-    Array.from({ length: n }).map(() => callImagesApiSingle(singleOpts, profile)),
+    Array.from({ length: n }).map((_, index) => callImagesApiSingle({ ...singleOpts, onPartialImage: (image) => opts.onPartialImage?.(image, index) }, profile)),
   )
 
   const successfulResults = results
@@ -172,6 +178,11 @@ async function callImagesApiSingle(opts: CallApiOptions, profile: ApiProfile): P
     formData.append('output_format', params.output_format)
     formData.append('moderation', params.moderation)
     formData.append('quality', params.quality)
+    if (params.transparent_output && params.transparent_method !== 'local') formData.append('background', 'transparent')
+    if (params.stream) {
+      formData.append('stream', 'true')
+      formData.append('partial_images', '2')
+    }
 
     if (params.output_format !== 'png' && params.output_compression != null) {
       formData.append('output_compression', String(params.output_compression))
@@ -225,6 +236,12 @@ async function callImagesApiSingle(opts: CallApiOptions, profile: ApiProfile): P
       quality: params.quality,
     }
 
+    if (params.transparent_output && params.transparent_method !== 'local') body.background = 'transparent'
+    if (params.stream) {
+      body.stream = true
+      body.partial_images = 2
+    }
+
     if (params.output_format !== 'png' && params.output_compression != null) {
       body.output_compression = params.output_compression
     }
@@ -248,6 +265,10 @@ async function callImagesApiSingle(opts: CallApiOptions, profile: ApiProfile): P
     throw new Error(await getApiErrorMessage(response))
   }
 
+  if (response.headers.get('content-type')?.includes('text/event-stream')) {
+    return readImageStream(response, mime, (image) => opts.onPartialImage?.(image, 0), opts.signal)
+  }
+
   const payload = await response.json() as ImageApiResponse
   const data = payload.data
   if (!Array.isArray(data) || !data.length) {
@@ -255,17 +276,20 @@ async function callImagesApiSingle(opts: CallApiOptions, profile: ApiProfile): P
   }
 
   const images: string[] = []
+  const actualParamsList: Array<Partial<TaskParams> | undefined> = []
   const revisedPrompts: Array<string | undefined> = []
   for (const item of data) {
     const b64 = item.b64_json
     if (b64) {
-      images.push(normalizeBase64Image(b64, mime))
+      images.push(normalizeBase64Image(b64, MIME_MAP[item.output_format ?? payload.output_format ?? ''] || mime))
+      actualParamsList.push(mergeActualParams(pickActualParams(payload), pickActualParams(item)))
       revisedPrompts.push(typeof item.revised_prompt === 'string' ? item.revised_prompt : undefined)
       continue
     }
 
     if (isHttpUrl(item.url) || isDataUrl(item.url)) {
-      images.push(await fetchImageUrlAsDataUrl(item.url, mime, opts.signal))
+      images.push(await fetchImageUrlAsDataUrl(item.url, MIME_MAP[item.output_format ?? payload.output_format ?? ''] || mime, opts.signal))
+      actualParamsList.push(mergeActualParams(pickActualParams(payload), pickActualParams(item)))
       revisedPrompts.push(typeof item.revised_prompt === 'string' ? item.revised_prompt : undefined)
     }
   }
@@ -280,7 +304,7 @@ async function callImagesApiSingle(opts: CallApiOptions, profile: ApiProfile): P
   return {
     images,
     actualParams,
-    actualParamsList: images.map(() => actualParams),
+    actualParamsList,
     revisedPrompts,
   }
 }
@@ -291,7 +315,7 @@ async function callResponsesImageApi(opts: CallApiOptions, profile: ApiProfile):
     return callResponsesImageApiSingle(opts, profile)
   }
 
-  const promises = Array.from({ length: n }).map(() => callResponsesImageApiSingle(opts, profile))
+  const promises = Array.from({ length: n }).map((_, index) => callResponsesImageApiSingle({ ...opts, onPartialImage: (image) => opts.onPartialImage?.(image, index) }, profile))
   const results = await Promise.allSettled(promises)
   
   const successfulResults = results
@@ -337,7 +361,8 @@ async function callResponsesImageApiSingle(opts: CallApiOptions, profile: ApiPro
   const body = {
     model: profile.model,
     input: createResponsesInput(prompt, inputImageDataUrls),
-    tools: [createResponsesImageTool(params, inputImageDataUrls.length > 0, opts.maskDataUrl)],
+    tools: [createResponsesImageTool(params, inputImageDataUrls.length > 0, opts.maskDataUrl, profile.imageGenerationModel)],
+    ...(params.stream ? { stream: true } : {}),
     tool_choice: 'required',
   }
 
@@ -354,6 +379,10 @@ async function callResponsesImageApiSingle(opts: CallApiOptions, profile: ApiPro
 
   if (!response.ok) {
     throw new Error(await getApiErrorMessage(response))
+  }
+
+  if (response.headers.get('content-type')?.includes('text/event-stream')) {
+    return readImageStream(response, mime, (image) => opts.onPartialImage?.(image, 0), opts.signal)
   }
 
   const payload = await response.json() as ResponsesApiResponse

@@ -2,9 +2,46 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { DEFAULT_PARAMS } from './types'
 import { DEFAULT_SETTINGS } from './lib/apiProfiles'
 import type { TaskRecord } from './types'
-import { editOutputs, markExpiredOpenAIRunningTasks, submitTask, useStore } from './store'
+import { editOutputs, markExpiredOpenAIRunningTasks, migrateImagePreferences, submitTask, useStore } from './store'
 
 const imageA = { id: 'image-a', dataUrl: 'data:image/png;base64,a' }
+
+describe('image upgrade preferences', () => {
+  it.each([2, 3])('restores original output for stored version %s without changing model, quality or history', (version) => {
+    const before = {
+      settings: { model: 'gpt-image-2.5-flare' },
+      params: { ...DEFAULT_PARAMS, size: '3840x1648', size_fit: 'pad', quality: 'low' },
+      tasks: [task({ params: { ...DEFAULT_PARAMS, size_fit: 'none' } })],
+    }
+    const after = migrateImagePreferences(before, version) as typeof before
+    expect(after.params).toMatchObject({ size: '3840x1648', size_fit: 'none', quality: 'low' })
+    expect(after.settings).toEqual(before.settings)
+    expect(after.tasks).toBe(before.tasks)
+    expect(migrateImagePreferences(before, 4)).toBe(before)
+  })
+  it('migrates the previous default to sunburst/high while preserving size and input', async () => {
+    const result = migrateImagePreferences({
+      settings: { model: 'gpt-image-2.5-flare', apiKey: 'saved-key' },
+      params: { ...DEFAULT_PARAMS, quality: 'auto', size: '2048x2048' }, prompt: 'keep me',
+    }, 1) as { settings: typeof DEFAULT_SETTINGS; params: typeof DEFAULT_PARAMS; prompt: string }
+    expect(result.settings.model).toBe('gpt-image-2.5-sunburst')
+    expect(result.settings.apiKey).toBe('saved-key')
+    expect(result.params).toMatchObject({ quality: 'high', size: '2048x2048' })
+    expect(result.prompt).toBe('keep me')
+  })
+
+  it('tracks previews only for running tasks and clears them without writing final outputs', () => {
+    useStore.setState({ tasks: [task({ status: 'running' })], taskPreviews: {} })
+    useStore.getState().setTaskPreview('task-a', 'data:image/png;base64,cA==', 1)
+    expect(useStore.getState().taskPreviews['task-a'][1]).toContain('cA==')
+    expect(useStore.getState().tasks[0].outputImages).toEqual([])
+    useStore.getState().setTaskPreview('task-a')
+    expect(useStore.getState().taskPreviews['task-a']).toBeUndefined()
+    useStore.setState({ tasks: [task()] })
+    useStore.getState().setTaskPreview('task-a', 'late-preview')
+    expect(useStore.getState().taskPreviews['task-a']).toBeUndefined()
+  })
+})
 
 function task(overrides: Partial<TaskRecord> = {}): TaskRecord {
   return {

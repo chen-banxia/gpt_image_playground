@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { useStore, submitTask, addImageFromFile, updateTaskInStore, removeMultipleTasks } from '../store'
 import { DEFAULT_PARAMS } from '../types'
 import { getActiveApiProfile } from '../lib/apiProfiles'
-import { IMAGE_MODEL_OPTIONS, isKnownImageModel } from '../lib/imageModels'
+import { IMAGE_MODEL_OPTIONS, isKnownImageModel, isGptImage25Model } from '../lib/imageModels'
 import { DEFAULT_FAL_IMAGE_SIZE, getChangedParams, getOutputImageLimitForSettings, normalizeParamsForSettings } from '../lib/paramCompatibility'
 import { normalizeImageSize } from '../lib/size'
 import { createMaskPreviewDataUrl } from '../lib/canvasImage'
@@ -161,7 +161,7 @@ export default function InputBar() {
   const activeProfile = getActiveApiProfile(settings)
   const activeProvider = activeProfile.provider
   const isFalProvider = activeProvider === 'fal'
-  const activeModel = activeProfile.model
+  const activeModel = activeProfile.apiMode === 'responses' ? activeProfile.imageGenerationModel ?? '' : activeProfile.model
   // fal 的模型是 endpoint（来自 Provider 配置），不属于这里的画图模型列表
   const modelSelectDisabled = isFalProvider
   const modelOptions = [
@@ -175,7 +175,7 @@ export default function InputBar() {
       ? [{ label: activeModel, value: activeModel }]
       : []),
   ]
-  const moderationDisabled = settings.apiMode === 'responses' || isFalProvider
+  const moderationDisabled = isFalProvider
   const compressionDisabled = params.output_format === 'png' || isFalProvider
   const outputImageLimit = getOutputImageLimitForSettings(settings)
   const nLimitHintText = isFalProvider
@@ -183,7 +183,7 @@ export default function InputBar() {
     : t('maxOpenAIRequests', { count: outputImageLimit })
   const displaySize = isFalProvider && params.size === 'auto'
     ? DEFAULT_FAL_IMAGE_SIZE
-    : normalizeImageSize(params.size) || DEFAULT_PARAMS.size
+    : (params.size_fit === 'pad' || params.size_fit === 'cover' ? params.size : normalizeImageSize(params.size)) || DEFAULT_PARAMS.size
   const qualityOptions = isFalProvider
     ? [
         { label: 'low', value: 'low' },
@@ -195,6 +195,7 @@ export default function InputBar() {
         { label: 'low', value: 'low' },
         { label: 'medium', value: 'medium' },
         { label: 'high', value: 'high' },
+        ...(isGptImage25Model(activeModel) ? [{ label: 'xhigh', value: 'xhigh' }, { label: 'max', value: 'max' }] : []),
       ]
   const atImageLimit = inputImages.length >= API_MAX_IMAGES
   const maskTargetImage = maskDraft
@@ -948,10 +949,10 @@ export default function InputBar() {
   const renderParams = (cols: string, modelCellClass = '') => (
     <div className={`grid ${cols} gap-2 text-xs flex-1`}>
       <label className={`relative flex flex-col gap-0.5 min-w-0 ${modelCellClass}`}>
-        <span className="text-gray-400 dark:text-gray-500 ml-1">{t('model')}</span>
+        <span className="text-gray-400 dark:text-gray-500 ml-1">{t(activeProfile.apiMode === 'responses' ? 'responseImageModel' : 'model')}</span>
         <Select
           value={activeModel}
-          onChange={(val) => setSettings({ model: val as string })}
+          onChange={(val) => setSettings(activeProfile.apiMode === 'responses' ? { imageGenerationModel: val as string } : { model: val as string })}
           options={modelOptions}
           disabled={modelSelectDisabled}
           title={modelSelectDisabled ? t('falModelFromProfile') : t('chooseModel')}
@@ -975,10 +976,15 @@ export default function InputBar() {
           type="button"
           onClick={() => setShowSizePicker(true)}
           className="px-3 py-1.5 rounded-xl border border-gray-200/60 dark:border-white/[0.08] bg-white/50 dark:bg-white/[0.03] hover:bg-white dark:hover:bg-white/[0.06] focus:outline-none text-xs text-left transition-all duration-200 shadow-sm font-mono truncate"
-          title={t('chooseSize')}
+          title={t('parametersBestEffort')}
         >
           {displaySize}
         </button>
+        {displaySize !== 'auto' && (
+          <span className="ml-1 text-[10px] text-gray-500 dark:text-gray-400">
+            {t(params.size_fit === 'pad' ? 'sizeFitPad' : params.size_fit === 'cover' ? 'sizeFitCover' : 'sizeFitNone')}
+          </span>
+        )}
         <ButtonTooltip
           visible={isFalProvider && sizeHintVisible}
           text={t('falNoAutoParam')}
@@ -1009,7 +1015,7 @@ export default function InputBar() {
         <span className="text-gray-400 dark:text-gray-500 ml-1">{t('format')}</span>
         <Select
           value={params.output_format}
-          onChange={(val) => setParams({ output_format: val as any })}
+          onChange={(val) => setParams({ output_format: val as typeof params.output_format, ...(val === 'jpeg' ? { transparent_output: false } : {}) })}
           options={[
             { label: 'PNG', value: 'png' },
             { label: 'JPEG', value: 'jpeg' },
@@ -1075,6 +1081,32 @@ export default function InputBar() {
         <ButtonTooltip
           visible={moderationDisabled && moderationHintVisible}
           text={isFalProvider ? t('falNoModeration') : t('responsesNoModeration')}
+        />
+      </label>
+      <label className="flex flex-col gap-0.5 min-w-0" title={t('transparentHint')}>
+        <span className="text-gray-400 dark:text-gray-500 ml-1">{t('transparentBackground')}</span>
+        <Select
+          value={params.transparent_output ? params.transparent_method ?? 'native' : 'off'}
+          onChange={(value) => setParams({
+            transparent_output: value !== 'off',
+            transparent_method: value === 'local' ? 'local' : 'native',
+            ...(value !== 'off' && params.output_format === 'jpeg' ? { output_format: 'png', output_compression: null } : {}),
+          })}
+          options={[
+            { label: t('backgroundDefault'), value: 'off' },
+            { label: t('backgroundNative'), value: 'native' },
+            { label: t('backgroundLocal'), value: 'local' },
+          ]}
+          className={selectClass}
+        />
+      </label>
+      <label className="flex flex-col gap-0.5 min-w-0" title={t('streamPreviewHint')}>
+        <span className="text-gray-400 dark:text-gray-500 ml-1">{t('streamPreview')}</span>
+        <Select value={params.stream && !isFalProvider ? 'on' : 'off'}
+          onChange={(value) => setParams({ stream: value === 'on' })}
+          disabled={isFalProvider}
+          options={[{ label: t('disabled'), value: 'off' }, { label: t('enabled'), value: 'on' }]}
+          className={selectClass}
         />
       </label>
       <label className="relative flex flex-col gap-0.5 min-w-0">
@@ -1146,7 +1178,8 @@ export default function InputBar() {
       {showSizePicker && (
         <SizePickerModal
           currentSize={isFalProvider && params.size === 'auto' ? DEFAULT_FAL_IMAGE_SIZE : params.size}
-          onSelect={(size) => setParams({ size })}
+          currentFit={params.size_fit}
+          onSelect={(size, size_fit) => setParams({ size, size_fit })}
           onClose={() => setShowSizePicker(false)}
           allowAuto={!isFalProvider}
         />
@@ -1256,7 +1289,7 @@ export default function InputBar() {
           <div className="mt-3">
             {/* 桌面端布局 */}
             <div className="hidden sm:flex items-end justify-between gap-3">
-              {renderParams('grid-cols-[minmax(0,1.8fr)_repeat(6,minmax(0,1fr))]')}
+              {renderParams('grid-cols-5')}
 
               <div className="flex gap-2 flex-shrink-0 mb-0.5">
                 <div

@@ -92,14 +92,15 @@ export default function Header() {
           </a>*/}
         </div>
         <div className="flex items-center gap-1">
-{/*          <button
+          <button
+            type="button"
             onClick={() => setSettings({ language: language === 'en' ? 'zh' : 'en' })}
             className="inline-flex h-9 items-center rounded-lg border border-gray-200 bg-white px-2.5 text-xs font-medium text-gray-600 transition hover:bg-gray-50 dark:border-white/[0.08] dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-white/[0.06]"
             title={language === 'en' ? t('switchToChinese') : t('switchToEnglish')}
             aria-label={t('language')}
           >
             {language === 'en' ? '中文' : 'EN'}
-          </button>*/}
+          </button>
           <button
             onClick={() => setShowHelp(true)}
             className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-900 transition-colors"

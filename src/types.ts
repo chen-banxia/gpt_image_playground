@@ -11,6 +11,7 @@ export interface ApiProfile {
   baseUrl: string
   apiKey: string
   model: string
+  imageGenerationModel?: string
   timeout: number
   apiMode: ApiMode
   codexCli: boolean
@@ -18,6 +19,7 @@ export interface ApiProfile {
 }
 
 export interface AppSettings {
+  imageGenerationModel?: string
   language: Language
   /** 旧版单配置字段：保留用于导入/查询参数兼容，实际请求以 active profile 为准 */
   baseUrl: string
@@ -37,7 +39,15 @@ export interface AppSettings {
 
 export interface TaskParams {
   size: string
-  quality: 'auto' | 'low' | 'medium' | 'high'
+  /** 最终画布处理策略；none 保留接口输出，pad 补边，cover 居中裁剪。 */
+  size_fit?: 'none' | 'pad' | 'cover'
+  /** 本地尺寸处理前解码得到的尺寸，仅用于结果元数据。 */
+  source_size?: string
+  quality: 'auto' | 'low' | 'medium' | 'high' | 'xhigh' | 'max'
+  transparent_output?: boolean
+  transparent_method?: 'native' | 'local'
+  stream?: boolean
+  background?: 'auto' | 'transparent' | 'opaque'
   output_format: 'png' | 'jpeg' | 'webp'
   output_compression: number | null
   moderation: 'auto' | 'low'
@@ -46,7 +56,11 @@ export interface TaskParams {
 
 export const DEFAULT_PARAMS: TaskParams = {
   size: 'auto',
-  quality: 'auto',
+  size_fit: 'none', // 默认保留接口原图；本地补边与裁剪由用户手动开启。
+  quality: 'high',
+  transparent_output: false,
+  transparent_method: 'native',
+  stream: false,
   output_format: 'png',
   output_compression: null,
   moderation: 'auto',
@@ -82,6 +96,7 @@ export interface TaskRecord {
   apiProfileName?: string
   /** 生成时使用的模型 ID */
   apiModel?: string
+  apiImageModel?: string
   /** fal.ai 队列请求 ID，用于连接断开后的结果恢复 */
   falRequestId?: string
   /** fal.ai 队列 endpoint，用于连接断开后的状态和结果查询 */

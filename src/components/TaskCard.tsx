@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react'
 import type { TaskRecord } from '../types'
 import { useStore, getCachedImage, ensureImageCached, updateTaskInStore, retryTask } from '../store'
 import { useT } from '../hooks/useI18n'
+import GenerationPreview from './GenerationPreview'
 import { formatImageRatio } from '../lib/size'
 import { ParamValue } from '../lib/paramDisplay'
 
@@ -23,6 +24,7 @@ export default function TaskCard({
   isSelected,
 }: Props) {
   const t = useT()
+  const previews = useStore((s) => s.taskPreviews[task.id])
   const [thumbSrc, setThumbSrc] = useState<string>('')
   const [coverRatio, setCoverRatio] = useState<string>('')
   const [coverSize, setCoverSize] = useState<string>('')
@@ -231,8 +233,9 @@ export default function TaskCard({
       )}
       <div className="flex h-40">
         {/* 左侧图片区域 */}
-        <div className="w-40 min-w-[10rem] h-full bg-gray-100 dark:bg-black/20 relative flex items-center justify-center overflow-hidden flex-shrink-0">
-          {task.status === 'running' && (
+        <div className="w-40 min-w-[10rem] h-full transparency-grid bg-gray-100 dark:bg-black/20 relative flex items-center justify-center overflow-hidden flex-shrink-0">
+          {task.status === 'running' && previews && <GenerationPreview images={previews} />}
+          {task.status === 'running' && !previews && (
             <div className="flex flex-col items-center gap-2">
               <svg
                 className="w-8 h-8 text-blue-400 animate-spin"

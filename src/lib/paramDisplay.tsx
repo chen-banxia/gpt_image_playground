@@ -78,6 +78,7 @@ export function getParamDisplay(task: TaskRecord, paramKey: ParamKey, actualPara
     String(actualValue) !== String(requestedValue)
 
   return {
+    hasActualValue,
     displayValue: String(displayValue),
     isMismatch,
     requestedValue: String(requestedValue),
@@ -86,21 +87,27 @@ export function getParamDisplay(task: TaskRecord, paramKey: ParamKey, actualPara
 }
 
 export function ParamValue({ task, paramKey, className = '', actualParams }: ParamValueProps) {
-  const { displayValue, isMismatch } = getParamDisplay(task, paramKey, actualParams)
+  const t = useT()
+  const { displayValue, isMismatch, hasActualValue } = getParamDisplay(task, paramKey, actualParams)
 
   if (isMismatch) {
     return <ActualValueBadge value={displayValue} className={className} />
   }
 
   return (
-    <span className={`${className} bg-gray-100 text-gray-500 dark:bg-white/[0.04] dark:text-gray-400`}>
+    <span title={!hasActualValue ? t('requestedParameter', { value: displayValue }) : undefined} className={`${className} bg-gray-100 text-gray-500 dark:bg-white/[0.04] dark:text-gray-400`}>
       {displayValue}
     </span>
   )
 }
 
 export function DetailParamValue({ task, paramKey, className = '', actualParams }: ParamValueProps) {
-  const { displayValue, isMismatch, requestedValue, isAutoResolved } = getParamDisplay(task, paramKey, actualParams)
+  const t = useT()
+  const { displayValue, isMismatch, requestedValue, isAutoResolved, hasActualValue } = getParamDisplay(task, paramKey, actualParams)
+
+  if (paramKey === 'quality' && task.status === 'done' && !hasActualValue) {
+    return <span className={className} title={t('requestedParameter', { value: requestedValue })}>{requestedValue} <span className="text-gray-400">({t('qualityUnreported')})</span></span>
+  }
 
   if (!isMismatch) {
     if (isAutoResolved) {

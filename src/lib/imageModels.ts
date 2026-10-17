@@ -12,12 +12,23 @@ export interface ImageModelOption {
  * 第一项与 apiProfiles 的 DEFAULT_IMAGES_MODEL 保持一致，为默认模型。
  */
 export const IMAGE_MODEL_OPTIONS: ImageModelOption[] = [
-  { value: 'gpt-image-2.5-flare', descriptionKey: 'modelDescGptImage25Flare' },
+  // -2k/-4k 是 codex2api 的网关别名，必须完整发送，不能去掉后缀后再调用。
   { value: 'gpt-image-2.5-sunburst', descriptionKey: 'modelDescGptImage25Sunburst' },
+  { value: 'gpt-image-2.5-sunburst-2k', descriptionKey: 'modelDescImage2K' },
+  { value: 'gpt-image-2.5-sunburst-4k', descriptionKey: 'modelDescImage4K' },
+  { value: 'gpt-image-2.5-flare', descriptionKey: 'modelDescGptImage25Flare' },
+  { value: 'gpt-image-2.5-flare-2k', descriptionKey: 'modelDescImage2K' },
+  { value: 'gpt-image-2.5-flare-4k', descriptionKey: 'modelDescImage4K' },
   { value: 'gpt-image-2.5', descriptionKey: 'modelDescGptImage25' },
   { value: 'gpt-image-2', descriptionKey: 'modelDescGptImage2' },
+  { value: 'gpt-image-2-2k', descriptionKey: 'modelDescImage2K' },
+  { value: 'gpt-image-2-4k', descriptionKey: 'modelDescImage4K' },
 ]
 
 export function isKnownImageModel(model: string): boolean {
   return IMAGE_MODEL_OPTIONS.some((option) => option.value === model)
+}
+
+export function isGptImage25Model(model: string) {
+  return model.toLowerCase().includes('gpt-image-2.5')
 }

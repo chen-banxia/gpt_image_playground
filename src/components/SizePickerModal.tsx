@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { calculateImageSize, normalizeImageSize, parseRatio, type SizeTier } from '../lib/size'
+import { calculateImageSize, normalizeImageSize, parseOutputSize, parseRatio, type SizeTier } from '../lib/size'
+import type { TaskParams } from '../types'
 import { useT } from '../hooks/useI18n'
 import ViewportTooltip from './ViewportTooltip'
 
@@ -17,7 +18,8 @@ const RATIOS = [
 
 interface Props {
   currentSize: string
-  onSelect: (size: string) => void
+  currentFit?: TaskParams['size_fit']
+  onSelect: (size: string, fit: NonNullable<TaskParams['size_fit']>) => void
   onClose: () => void
   allowAuto?: boolean
 }
@@ -31,7 +33,7 @@ function parseSize(size: string) {
 }
 
 function findPresetForSize(size: string) {
-  const normalized = normalizeImageSize(size)
+  const normalized = size.trim()
   for (const tier of TIERS) {
     for (const ratio of RATIOS) {
       if (calculateImageSize(tier, ratio.value) === normalized) {
@@ -42,7 +44,7 @@ function findPresetForSize(size: string) {
   return null
 }
 
-export default function SizePickerModal({ currentSize, onSelect, onClose, allowAuto = true }: Props) {
+export default function SizePickerModal({ currentSize, currentFit = 'none', onSelect, onClose, allowAuto = true }: Props) {
   const t = useT()
   const currentPreset = findPresetForSize(currentSize)
   const currentParsedSize = parseSize(currentSize)
@@ -60,6 +62,7 @@ export default function SizePickerModal({ currentSize, onSelect, onClose, allowA
   // Resolution mode state
   const [customW, setCustomW] = useState(currentParsedSize?.width ?? '1024')
   const [customH, setCustomH] = useState(currentParsedSize?.height ?? '1024')
+  const [fit, setFit] = useState<NonNullable<TaskParams['size_fit']>>(currentFit)
 
   const [hintVisible, setHintVisible] = useState(false)
   const hintTimerRef = useRef<number | null>(null)
@@ -86,16 +89,20 @@ export default function SizePickerModal({ currentSize, onSelect, onClose, allowA
     }
     
     if (mode === 'resolution') {
-      const w = parseInt(customW, 10)
-      const h = parseInt(customH, 10)
+      const w = Number(customW)
+      const h = Number(customH)
       if (Number.isFinite(w) && Number.isFinite(h) && w > 0 && h > 0) {
+        if (fit !== 'none') {
+          const target = parseOutputSize(`${w}x${h}`)
+          return target ? `${target.width}x${target.height}` : ''
+        }
         return normalizeImageSize(`${w}x${h}`)
       }
       return ''
     }
     
     return ''
-  }, [mode, tier, activeRatio, customW, customH])
+  }, [mode, tier, activeRatio, customW, customH, fit])
 
   const isClamped = useMemo(() => {
     if (!previewSize || previewSize === 'auto') return false
@@ -130,7 +137,7 @@ export default function SizePickerModal({ currentSize, onSelect, onClose, allowA
 
   const applySize = () => {
     if (!previewSize) return
-    onSelect(previewSize)
+    onSelect(previewSize, fit)
     onClose()
   }
 
@@ -145,7 +152,7 @@ export default function SizePickerModal({ currentSize, onSelect, onClose, allowA
     <div data-no-drag-select className="fixed inset-0 z-[70] flex items-center justify-center p-4" onClick={onClose}>
       <div className="absolute inset-0 bg-black/30 backdrop-blur-sm animate-overlay-in" />
       <div
-        className="relative z-10 w-full max-w-md rounded-3xl border border-white/50 bg-white/95 p-5 shadow-2xl ring-1 ring-black/5 animate-modal-in dark:border-white/[0.08] dark:bg-gray-900/95 dark:ring-white/10"
+        className="relative z-10 w-full max-w-md max-h-[90vh] overflow-y-auto rounded-3xl border border-white/50 bg-white/95 p-5 shadow-2xl ring-1 ring-black/5 animate-modal-in dark:border-white/[0.08] dark:bg-gray-900/95 dark:ring-white/10"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-5 flex items-start justify-between gap-4">
@@ -285,13 +292,28 @@ export default function SizePickerModal({ currentSize, onSelect, onClose, allowA
                     <svg className="mt-0.5 h-4 w-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    <span>{t('sizeLimitText')}</span>
+                    <span>{t(fit === 'none' ? 'sizeLimitText' : 'exactSizeLimits')}</span>
                   </p>
                 </div>
               </div>
             )}
           </div>
 
+          {mode !== 'auto' && (
+            <section className="space-y-2">
+              <div className="text-xs font-medium text-gray-500 dark:text-gray-400">{t('sizeFitLabel')}</div>
+              <div className="grid grid-cols-3 gap-2">
+                {(['none', 'pad', 'cover'] as const).map((value) => (
+                  <button type="button" key={value} className={buttonClass(fit === value)} onClick={() => setFit(value)}>
+                    {t(value === 'none' ? 'sizeFitNone' : value === 'pad' ? 'sizeFitPad' : 'sizeFitCover')}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs leading-relaxed text-gray-500 dark:text-gray-400">
+                {t(fit === 'none' ? 'sizeFitNoneHint' : fit === 'pad' ? 'sizeFitPadHint' : 'sizeFitCoverHint')}
+              </p>
+            </section>
+          )}
           <div className="rounded-2xl bg-gray-50 px-4 py-3 dark:bg-white/[0.03]">
             <div className="text-xs text-gray-400 dark:text-gray-500">{t('willUse')}</div>
             <div className="mt-1 flex items-center gap-2">
@@ -317,6 +339,11 @@ export default function SizePickerModal({ currentSize, onSelect, onClose, allowA
                 </div>
               )}
             </div>
+            {mode !== 'auto' && fit !== 'none' && previewSize && (
+              <p className="mt-2 text-xs leading-relaxed text-gray-500 dark:text-gray-400">
+                {t('exactSizeRequestHint', { size: normalizeImageSize(previewSize) })}
+              </p>
+            )}
           </div>
         </div>
 

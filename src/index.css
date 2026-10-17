@@ -223,3 +223,8 @@ input[type="number"] {
     font-size: 16px;
   }
 }
+
+.transparency-grid {
+  background-image: conic-gradient(#8882 25%, transparent 0 50%, #8882 0 75%, transparent 0);
+  background-size: 16px 16px;
+}

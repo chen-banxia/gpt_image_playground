@@ -23,7 +23,7 @@ import {
   clearImages,
   storeImage,
 } from './lib/db'
-import { callImageApi } from './lib/api'
+import { callImageApi, finalizeImageResult } from './lib/api'
 import { getFalErrorMessage, getFalQueuedImageResult, getFalQueueStatus } from './lib/falAiImageApi'
 import { validateMaskMatchesImage } from './lib/canvasImage'
 import { orderInputImagesForMask } from './lib/mask'
@@ -100,6 +100,9 @@ interface AppState {
   params: TaskParams
   setParams: (p: Partial<TaskParams>) => void
 
+  taskPreviews: Record<string, Record<number, string>>
+  setTaskPreview: (taskId: string, image?: string, index?: number) => void
+
   // 任务列表
   tasks: TaskRecord[]
   setTasks: (t: TaskRecord[]) => void
@@ -147,6 +150,24 @@ interface AppState {
   setConfirmDialog: (d: AppState['confirmDialog']) => void
 }
 
+export function migrateImagePreferences(persistedState: unknown, version: number) {
+  const state = (persistedState ?? {}) as Record<string, unknown>
+  if (version >= 4) return state as never
+  if (version >= 2) {
+    const params = { ...DEFAULT_PARAMS, ...(state.params as Partial<TaskParams> ?? {}) }
+    // 恢复网关原图输出；只重置当前输入偏好，不改历史任务。
+    params.size_fit = 'none'
+    return { ...state, params } as never
+  }
+  const settings = version < 1 ? migrateLegacyDefaultImagesModel(state.settings) : normalizeSettings(state.settings)
+  const profiles = settings.profiles.map((profile) => profile.provider === 'openai' && profile.model === 'gpt-image-2.5-flare'
+    ? { ...profile, model: 'gpt-image-2.5-sunburst' } : profile)
+  const params = { ...DEFAULT_PARAMS, ...(state.params as Partial<TaskParams> ?? {}) }
+  if (params.quality === 'auto') params.quality = 'high'
+  params.size_fit = 'none'
+  return { ...state, params, settings: normalizeSettings({ ...settings, profiles }) } as never
+}
+
 export const useStore = create<AppState>()(
   persist(
     (set, get) => ({
@@ -159,6 +180,7 @@ export const useStore = create<AppState>()(
           incoming.baseUrl !== undefined ||
           incoming.apiKey !== undefined ||
           incoming.model !== undefined ||
+          incoming.imageGenerationModel !== undefined ||
           incoming.timeout !== undefined ||
           incoming.apiMode !== undefined ||
           incoming.codexCli !== undefined ||
@@ -172,6 +194,7 @@ export const useStore = create<AppState>()(
                   baseUrl: incoming.baseUrl ?? profile.baseUrl,
                   apiKey: incoming.apiKey ?? profile.apiKey,
                   model: incoming.model ?? profile.model,
+                  imageGenerationModel: incoming.imageGenerationModel ?? profile.imageGenerationModel,
                   timeout: incoming.timeout ?? profile.timeout,
                   apiMode: incoming.apiMode === 'images' || incoming.apiMode === 'responses' ? incoming.apiMode : profile.apiMode,
                   codexCli: incoming.codexCli ?? profile.codexCli,
@@ -250,6 +273,17 @@ export const useStore = create<AppState>()(
       params: { ...DEFAULT_PARAMS },
       setParams: (p) => set((s) => ({ params: { ...s.params, ...p } })),
 
+      taskPreviews: {},
+      setTaskPreview: (taskId, image, index = 0) => set((state) => {
+        const taskPreviews = { ...state.taskPreviews }
+        if (image && state.tasks.some((task) => task.id === taskId && task.status === 'running')) {
+          taskPreviews[taskId] = { ...taskPreviews[taskId], [index]: image }
+        } else {
+          delete taskPreviews[taskId]
+        }
+        return { taskPreviews }
+      }),
+
       // Tasks
       tasks: [],
       setTasks: (tasks) => set({ tasks }),
@@ -304,12 +338,8 @@ export const useStore = create<AppState>()(
     }),
     {
       name: 'gpt-image-playground',
-      version: 1,
-      migrate: (persistedState, version) => {
-        const state = (persistedState ?? {}) as Record<string, unknown>
-        if (version >= 1) return state as never
-        return { ...state, settings: migrateLegacyDefaultImagesModel(state.settings) } as never
-      },
+      version: 4,
+      migrate: migrateImagePreferences,
       partialize: (state) => {
         const shouldRememberApiKey = state.settings.rememberApiKey
         const sanitizedSettings: AppSettings = shouldRememberApiKey
@@ -503,6 +533,8 @@ function scheduleFalRecovery(taskId: string, delayMs = FAL_RECOVERY_POLL_MS) {
 async function completeRecoveredFalTask(task: TaskRecord, result: Awaited<ReturnType<typeof getFalQueuedImageResult>>) {
   const latest = useStore.getState().tasks.find((item) => item.id === task.id)
   if (!latest || latest.status === 'done') return
+
+  result = await finalizeImageResult(result, task.params)
 
   const outputIds: string[] = []
   for (const dataUrl of result.images) {
@@ -702,6 +734,7 @@ export async function submitTask(options: { allowFullMask?: boolean } = {}) {
     apiProvider: activeProfile.provider,
     apiProfileName: activeProfile.name,
     apiModel: activeProfile.model,
+    apiImageModel: activeProfile.apiMode === 'responses' ? activeProfile.imageGenerationModel : undefined,
     inputImageIds: orderedInputImages.map((i) => i.id),
     maskTargetImageId,
     maskImageId,
@@ -773,6 +806,7 @@ async function executeTask(taskId: string) {
       inputImageDataUrls: inputDataUrls,
       maskDataUrl,
       signal: openAIAbortController?.signal,
+      onPartialImage: (image, index) => useStore.getState().setTaskPreview(taskId, image, index),
       onFalRequestEnqueued: (request) => {
         falRequestInfo = request
         updateTaskInStore(taskId, {
@@ -875,6 +909,7 @@ async function executeTask(taskId: string) {
       useStore.getState().setDetailTaskId(taskId)
     }
   } finally {
+    useStore.getState().setTaskPreview(taskId)
     executingTaskIds.delete(taskId)
     // 释放输入图片的内存缓存（已持久化到 IndexedDB，后续按需从 DB 加载）
     for (const imgId of task.inputImageIds) {
@@ -906,6 +941,7 @@ export async function retryTask(task: TaskRecord) {
     apiProvider: activeProfile.provider,
     apiProfileName: activeProfile.name,
     apiModel: activeProfile.model,
+    apiImageModel: activeProfile.apiMode === 'responses' ? activeProfile.imageGenerationModel : undefined,
     inputImageIds: [...task.inputImageIds],
     maskTargetImageId: task.maskTargetImageId ?? null,
     maskImageId: task.maskImageId ?? null,

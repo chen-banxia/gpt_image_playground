@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo, useRef } from 'react'
 import { useStore, getCachedImage, ensureImageCached, reuseConfig, editOutputs, removeTask, updateTaskInStore, showCodexCliPrompt, getCodexCliPromptKey, retryTask } from '../store'
 import { useCloseOnEscape } from '../hooks/useCloseOnEscape'
 import { useLanguage, useT } from '../hooks/useI18n'
+import GenerationPreview from './GenerationPreview'
 import { formatImageRatio } from '../lib/size'
 import { ActualValueBadge, DetailParamValue } from '../lib/paramDisplay'
 import { copyBlobToClipboard, copyTextToClipboard, getClipboardFailureMessage } from '../lib/clipboard'
@@ -12,6 +13,7 @@ export default function DetailModal() {
   const t = useT()
   const tasks = useStore((s) => s.tasks)
   const detailTaskId = useStore((s) => s.detailTaskId)
+  const previews = useStore((s) => detailTaskId ? s.taskPreviews[detailTaskId] : undefined)
   const setDetailTaskId = useStore((s) => s.setDetailTaskId)
   const setLightboxImageId = useStore((s) => s.setLightboxImageId)
   const setMaskEditorImageId = useStore((s) => s.setMaskEditorImageId)
@@ -170,7 +172,7 @@ export default function DetailModal() {
   const taskProvider = task.apiProvider
   const taskProviderName = taskProvider === 'fal' ? 'fal.ai' : taskProvider ? 'OpenAI' : t('unknown')
   const taskProfileName = task.apiProfileName || t('unknown')
-  const taskModel = task.apiModel || t('unknown')
+  const taskModel = task.apiImageModel ? `${task.apiModel} / ${task.apiImageModel}` : task.apiModel || t('unknown')
   const showSourceInfo = Boolean(task.apiProvider || task.apiProfileName || task.apiModel)
   const isFalReconnecting = task.status === 'error' && task.falRecoverable
 
@@ -294,7 +296,7 @@ export default function DetailModal() {
         </div>
 
         {/* 左侧：图片 */}
-        <div ref={imagePanelRef} className="md:w-1/2 w-full h-64 md:h-auto bg-gray-100 dark:bg-black/20 relative flex items-center justify-center flex-shrink-0 min-h-[16rem]">
+        <div ref={imagePanelRef} className="md:w-1/2 w-full h-64 md:h-auto transparency-grid bg-gray-100 dark:bg-black/20 relative flex items-center justify-center flex-shrink-0 min-h-[16rem]">
           {task.status === 'done' && outputLen > 0 && currentOutputImageSrc && (
             <>
               <img
@@ -367,6 +369,7 @@ export default function DetailModal() {
               )}
             </>
           )}
+          {task.status === 'running' && previews && <GenerationPreview images={previews} />}
           {(task.status === 'running' || isFalReconnecting) && (
             <>
               <div className="absolute left-4 top-4 flex items-center gap-1 bg-black/50 text-white text-xs px-2 py-0.5 rounded backdrop-blur-sm font-mono">
@@ -375,7 +378,7 @@ export default function DetailModal() {
                 </svg>
                 {formatDuration()}
               </div>
-              {task.status === 'running' && (
+              {task.status === 'running' && !previews && (
                 <svg className="w-10 h-10 text-blue-400 animate-spin" fill="none" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
@@ -556,6 +559,17 @@ export default function DetailModal() {
                 <span className="text-gray-400 dark:text-gray-500">{t('size')}</span>
                 <br />
                 <DetailParamValue task={task} paramKey="size" className="font-medium" actualParams={currentActualParams} />
+                {task.params.size !== 'auto' && (
+                  <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    {t('sizeFitLabel')}: {t(task.params.size_fit === 'pad' ? 'sizeFitPad' : task.params.size_fit === 'cover' ? 'sizeFitCover' : 'sizeFitNone')}
+                  </div>
+                )}
+                {currentActualParams?.source_size && (
+                  <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    {t('exactSizeApplied', { size: currentActualParams.source_size })}
+                    {' · '}{t(currentActualParams.size_fit === 'cover' ? 'sizeFitCover' : 'sizeFitPad')}
+                  </div>
+                )}
               </div>
               <div className="bg-gray-50 dark:bg-white/[0.03] rounded-lg px-3 py-2">
                 <span className="text-gray-400 dark:text-gray-500">{t('quality')}</span>
@@ -582,6 +596,13 @@ export default function DetailModal() {
                   <span className="text-gray-400 dark:text-gray-500">{t('compression')}</span>
                   <br />
                   <DetailParamValue task={task} paramKey="output_compression" className="font-medium" actualParams={currentActualParams} />
+                </div>
+              )}
+              {task.params.transparent_output && (
+                <div className="bg-gray-50 dark:bg-white/[0.03] rounded-lg px-3 py-2">
+                  <span className="text-gray-400 dark:text-gray-500">{t('transparentBackground')}</span><br />
+                  <span className="font-medium">{t(task.params.transparent_method === 'local' ? 'backgroundLocal' : 'backgroundNative')}</span>
+                  {currentActualParams?.background && <div className="text-gray-400">{t('backgroundActual')}: {currentActualParams.background}</div>}
                 </div>
               )}
             </div>

@@ -32,7 +32,7 @@ async function mapFalImageSize(size: string): Promise<{ width: number; height: n
   return DEFAULT_FAL_IMAGE_SIZE
 }
 
-function mapFalQuality(quality: TaskParams['quality']): 'low' | 'medium' | 'high' {
+function mapFalQuality(quality: TaskParams['quality']): Exclude<TaskParams['quality'], 'auto'> {
   return quality === 'auto' ? 'high' : quality
 }
 
@@ -52,6 +52,8 @@ async function createFalRequestInput(opts: CallApiOptions): Promise<Record<strin
     num_images: Math.min(4, Math.max(1, opts.params.n || 1)),
     output_format: opts.params.output_format,
   }
+
+  if (opts.params.transparent_output && opts.params.transparent_method !== 'local') input.background = 'transparent'
 
   if (isEdit) {
     input.image_urls = opts.inputImageDataUrls
