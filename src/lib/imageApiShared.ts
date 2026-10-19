@@ -24,6 +24,8 @@ export interface CallApiOptions {
 }
 
 export interface CallApiResult {
+  /** 实际发给网关的模型，可能包含按目标尺寸选择的超分后缀。 */
+  requestModel?: string
   /** base64 data URL 列表 */
   images: string[]
   /** API 返回的实际生效参数 */

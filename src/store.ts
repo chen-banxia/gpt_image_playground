@@ -26,6 +26,8 @@ import {
 import { callImageApi, finalizeImageResult } from './lib/api'
 import { getFalErrorMessage, getFalQueuedImageResult, getFalQueueStatus } from './lib/falAiImageApi'
 import { validateMaskMatchesImage } from './lib/canvasImage'
+import { applyExactImageSize } from './lib/exactImageSize'
+import { parseOutputSize } from './lib/size'
 import { orderInputImagesForMask } from './lib/mask'
 import { getChangedParams, normalizeParamsForSettings } from './lib/paramCompatibility'
 import { zipSync, unzipSync, strToU8, strFromU8 } from 'fflate'
@@ -857,6 +859,7 @@ async function executeTask(taskId: string) {
     clearOpenAIWatchdogTimer(taskId)
     updateTaskInStore(taskId, {
       outputImages: outputIds,
+      apiModel: result.requestModel ?? task.apiModel,
       actualParams: shouldStoreApiResponseMetadata ? { ...result.actualParams, n: outputIds.length } : undefined,
       actualParamsByImage: actualParamsByImage && Object.keys(actualParamsByImage).length > 0 ? actualParamsByImage : undefined,
       revisedPromptByImage: revisedPromptByImage && Object.keys(revisedPromptByImage).length > 0 ? revisedPromptByImage : undefined,
@@ -958,6 +961,37 @@ export async function retryTask(task: TaskRecord) {
   await putTask(newTask)
 
   executeTask(taskId)
+}
+
+/** 从指定成品创建铺满版本，不覆盖原图，也不再次调用生图接口。 */
+export async function createFilledOutput(taskId: string, imageId: string) {
+  const task = useStore.getState().tasks.find((item) => item.id === taskId)
+  if (!task || task.status !== 'done' || !task.outputImages.includes(imageId)) return
+  if (!parseOutputSize(task.params.size)) throw new Error(tr('invalidOutputSize'))
+  const source = await ensureImageCached(imageId)
+  if (!source) throw new Error(tr('inputImageMissing'))
+  const reported = task.actualParamsByImage?.[imageId] ?? task.actualParams
+  const params: TaskParams = { ...task.params, size_fit: 'cover', n: 1 }
+  const result = await applyExactImageSize(source, params, undefined,
+    reported?.size_fit === 'pad' ? reported.source_size : undefined)
+  const outputId = await storeImage(result.image, 'generated')
+  const actual: Partial<TaskParams> = {
+    ...reported, size: params.size, source_size: result.sourceSize, size_fit: 'cover', n: 1,
+    output_format: result.image.startsWith('data:image/png') ? 'png' : params.output_format,
+  }
+  const copy: TaskRecord = {
+    id: genId(), prompt: task.prompt, params,
+    apiProvider: task.apiProvider, apiProfileName: task.apiProfileName,
+    apiModel: task.apiModel, apiImageModel: task.apiImageModel,
+    // 保留来源图片引用，使清理历史记录时仍能保护副本依赖的原图。
+    inputImageIds: [imageId], outputImages: [outputId],
+    actualParams: actual, actualParamsByImage: { [outputId]: actual },
+    status: 'done', error: null, createdAt: Date.now(), finishedAt: Date.now(), elapsed: 0,
+  }
+  await putTask(copy)
+  imageCache.set(outputId, result.image)
+  useStore.getState().setTasks([copy, ...useStore.getState().tasks])
+  useStore.getState().setDetailTaskId(copy.id)
 }
 
 /** 复用配置 */

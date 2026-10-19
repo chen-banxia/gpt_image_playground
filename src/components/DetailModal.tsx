@@ -1,9 +1,9 @@
 import { useEffect, useState, useMemo, useRef } from 'react'
-import { useStore, getCachedImage, ensureImageCached, reuseConfig, editOutputs, removeTask, updateTaskInStore, showCodexCliPrompt, getCodexCliPromptKey, retryTask } from '../store'
+import { useStore, getCachedImage, ensureImageCached, reuseConfig, editOutputs, removeTask, updateTaskInStore, showCodexCliPrompt, getCodexCliPromptKey, retryTask, createFilledOutput } from '../store'
 import { useCloseOnEscape } from '../hooks/useCloseOnEscape'
 import { useLanguage, useT } from '../hooks/useI18n'
 import GenerationPreview from './GenerationPreview'
-import { formatImageRatio } from '../lib/size'
+import { formatImageRatio, parseOutputSize } from '../lib/size'
 import { ActualValueBadge, DetailParamValue } from '../lib/paramDisplay'
 import { copyBlobToClipboard, copyTextToClipboard, getClipboardFailureMessage } from '../lib/clipboard'
 import { createMaskPreviewDataUrl } from '../lib/canvasImage'
@@ -23,6 +23,7 @@ export default function DetailModal() {
   const dismissedCodexCliPrompts = useStore((s) => s.dismissedCodexCliPrompts)
 
   const [imageIndex, setImageIndex] = useState(0)
+  const [filling, setFilling] = useState(false)
   const [imageSrcs, setImageSrcs] = useState<Record<string, string>>({})
   const [imageRatios, setImageRatios] = useState<Record<string, string>>({})
   const [imageSizes, setImageSizes] = useState<Record<string, string>>({})
@@ -568,6 +569,28 @@ export default function DetailModal() {
                   <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                     {t('exactSizeApplied', { size: currentActualParams.source_size })}
                     {' · '}{t(currentActualParams.size_fit === 'cover' ? 'sizeFitCover' : 'sizeFitPad')}
+                  </div>
+                )}
+                {task.status === 'done' && currentOutputImageId && parseOutputSize(task.params.size) && (
+                  <div className="mt-2">
+                    <button type="button" disabled={filling}
+                      className="rounded-lg bg-blue-50 px-2 py-1 text-blue-600 hover:bg-blue-100 disabled:opacity-50 dark:bg-blue-500/10 dark:text-blue-300"
+                      onClick={() => setConfirmDialog({
+                        title: t('fillOutput'),
+                        message: t('fillOutputHint', { size: task.params.size }),
+                        confirmText: t('fillOutput'),
+                        action: async () => {
+                          setFilling(true)
+                          try {
+                            await createFilledOutput(task.id, currentOutputImageId)
+                            showToast(t('fillOutputDone'), 'success')
+                          } catch (error) {
+                            showToast(error instanceof Error ? error.message : String(error), 'error')
+                          } finally { setFilling(false) }
+                        },
+                      })}>
+                      {t('fillOutput')}
+                    </button>
                   </div>
                 )}
               </div>

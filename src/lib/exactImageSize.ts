@@ -11,7 +11,7 @@ export function getOutputPlacement(sw: number, sh: number, width: number, height
   return { x: (width - drawWidth) / 2, y: (height - drawHeight) / 2, width: drawWidth, height: drawHeight }
 }
 
-export async function applyExactImageSize(dataUrl: string, params: TaskParams, signal?: AbortSignal) {
+export async function applyExactImageSize(dataUrl: string, params: TaskParams, signal?: AbortSignal, paddedSourceSize?: string) {
   const target = parseOutputSize(params.size)
   if (!target || (params.size_fit !== 'pad' && params.size_fit !== 'cover')) throw new Error(tCurrent('invalidOutputSize'))
   signal?.throwIfAborted()
@@ -19,7 +19,13 @@ export async function applyExactImageSize(dataUrl: string, params: TaskParams, s
   signal?.throwIfAborted()
   if (!image.naturalWidth || !image.naturalHeight) throw new Error(tCurrent('imageLoadFailed'))
   const sourceSize = `${image.naturalWidth}x${image.naturalHeight}`
-  if (image.naturalWidth === target.width && image.naturalHeight === target.height) return { image: dataUrl, sourceSize, resized: false }
+  // 仅对明确记录为本地补边的旧图，按原始比例反算内容区域。
+  // 不自动扫描透明像素，避免误删贴纸、图标本来就需要的透明留白。
+  const paddedSource = paddedSourceSize ? parseOutputSize(paddedSourceSize) : null
+  const sourceRect = paddedSource
+    ? getOutputPlacement(paddedSource.width, paddedSource.height, image.naturalWidth, image.naturalHeight, 'pad')
+    : { x: 0, y: 0, width: image.naturalWidth, height: image.naturalHeight }
+  if (!paddedSource && image.naturalWidth === target.width && image.naturalHeight === target.height) return { image: dataUrl, sourceSize, resized: false }
   const canvas = document.createElement('canvas')
   canvas.width = target.width
   canvas.height = target.height
@@ -33,13 +39,18 @@ export async function applyExactImageSize(dataUrl: string, params: TaskParams, s
     }
     ctx.imageSmoothingEnabled = true
     ctx.imageSmoothingQuality = 'high'
-    const rect = getOutputPlacement(image.naturalWidth, image.naturalHeight, target.width, target.height, params.size_fit)
-    ctx.drawImage(image, rect.x, rect.y, rect.width, rect.height)
+    const rect = getOutputPlacement(sourceRect.width, sourceRect.height, target.width, target.height, params.size_fit)
+    if (paddedSource) {
+      // 先排除旧补边，再铺满目标画布；否则同尺寸短路会把空白原样保留下来。
+      ctx.drawImage(image, sourceRect.x, sourceRect.y, sourceRect.width, sourceRect.height, rect.x, rect.y, rect.width, rect.height)
+    } else {
+      ctx.drawImage(image, rect.x, rect.y, rect.width, rect.height)
+    }
     const quality = params.output_compression == null ? undefined : Math.max(0, Math.min(1, params.output_compression / 100))
     const output = canvas.toDataURL(`image/${params.output_format}`, quality)
     if (!output.startsWith('data:image/')) throw new Error(tCurrent('imageExportFailed'))
     signal?.throwIfAborted()
-    return { image: output, sourceSize, resized: true }
+    return { image: output, sourceSize: paddedSource ? `${paddedSource.width}x${paddedSource.height}` : sourceSize, resized: true }
   } finally {
     canvas.width = 0
     canvas.height = 0

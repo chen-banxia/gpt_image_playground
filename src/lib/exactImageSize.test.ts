@@ -50,6 +50,21 @@ describe('exact final canvas', () => {
     expect(output).toEqual({ image: 'original', sourceSize: '1000x1000', resized: false })
   })
 
+  it('removes recorded square padding before filling an already target-sized wide image', async () => {
+    const image = { naturalWidth: 3840, naturalHeight: 1648 } as HTMLImageElement
+    vi.spyOn(canvasImage, 'loadImage').mockResolvedValue(image)
+    const drawImage = vi.fn()
+    const canvas = { width: 0, height: 0, getContext: () => ({ drawImage }), toDataURL: () => 'data:image/png;base64,Zg==' }
+    vi.stubGlobal('document', { createElement: () => canvas })
+    const output = await applyExactImageSize('padded', { ...DEFAULT_PARAMS, size: '3840x1648', size_fit: 'cover' }, undefined, '1254x1254')
+    expect(drawImage).toHaveBeenCalledOnce()
+    expect(drawImage.mock.calls[0][0]).toBe(image)
+    const expected = [1096, 0, 1648, 1648, 0, -1096, 3840, 3840]
+    expected.forEach((value, index) => expect(drawImage.mock.calls[0][index + 1]).toBeCloseTo(value))
+    expect(output.resized).toBe(true)
+    expect(output.sourceSize).toBe('1254x1254')
+  })
+
   it('rejects an aborted operation before decoding', async () => {
     const load = vi.spyOn(canvasImage, 'loadImage')
     const controller = new AbortController()

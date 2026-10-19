@@ -8,6 +8,7 @@ import type { CallApiOptions, CallApiResult } from './imageApiShared'
 import type { TaskParams } from '../types'
 import { normalizeImageSize } from './size'
 import { applyExactImageSize } from './exactImageSize'
+import { buildImageCompositionPrompt, resolveUpscaleModel, stripImageCompositionPrompt } from './imageComposition'
 
 export type { CallApiOptions, CallApiResult } from './imageApiShared'
 export { normalizeBaseUrl } from './devProxy'
@@ -16,11 +17,18 @@ export async function callImageApi(opts: CallApiOptions): Promise<CallApiResult>
   const profile = getActiveApiProfile(opts.settings)
   const params = normalizeParamsForSettings(opts.params, opts.settings)
   const localTransparency = params.transparent_output && params.transparent_method === 'local'
+  const compositionPrompt = buildImageCompositionPrompt(opts.prompt, params, opts.inputImageDataUrls.length > 0, Boolean(opts.maskDataUrl))
+  // 2K/4K 后处理由 codex2api 的 Images 别名触发；Responses 工具不支持同一超分路由。
+  const requestProfile = profile.provider === 'openai' && profile.apiMode === 'images'
+    ? { ...profile, model: resolveUpscaleModel(profile.model, normalizeImageSize(params.size)) }
+    : profile
   // 上游尺寸用于生图，用户的精确目标保留至最终输出阶段，避免 1080 被改成 1088。
-  const request = { ...opts, params: { ...params, size: normalizeImageSize(params.size) }, prompt: localTransparency ? buildTransparentPrompt(opts.prompt) : opts.prompt }
+  const request = { ...opts, params: { ...params, size: normalizeImageSize(params.size) }, prompt: localTransparency ? buildTransparentPrompt(compositionPrompt) : compositionPrompt }
   const result = profile.provider === 'fal'
     ? await callFalAiImageApi(request, profile)
-    : await callOpenAICompatibleImageApi(request, profile)
+    : await callOpenAICompatibleImageApi(request, requestProfile)
+  result.requestModel = requestProfile.model
+  result.revisedPrompts = result.revisedPrompts?.map(stripImageCompositionPrompt)
   return finalizeImageResult(result, params, opts.signal)
 }
 

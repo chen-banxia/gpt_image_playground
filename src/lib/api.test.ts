@@ -18,7 +18,7 @@ describe('callImageApi', () => {
         params: { ...DEFAULT_PARAMS, size: '3840x1648', quality: 'high' },
         prompt: 'draw', inputImageDataUrls: [],
       })
-      expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toMatchObject({ model, size: '3840x1648', quality: 'high' })
+      expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toMatchObject({ model: model === 'gpt-image-2.5-flare' ? 'gpt-image-2.5-flare-4k' : model, size: '3840x1648', quality: 'high' })
       expect(resize).not.toHaveBeenCalled()
       expect(result.images).toEqual(['data:image/png;base64,Z2F0ZXdheQ=='])
       expect(result.actualParams).toMatchObject({ size: '2048x2048', quality: 'low' })
@@ -49,6 +49,50 @@ describe('callImageApi', () => {
     vi.restoreAllMocks()
     vi.unstubAllEnvs()
     vi.unstubAllGlobals()
+  })
+
+  it.each(['images', 'responses'] as const)('injects composition only into the %s request and strips exact upstream echoes', async (apiMode) => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url, init) => {
+      const body = JSON.parse(String(init?.body))
+      const prompt = apiMode === 'images' ? body.prompt : body.input
+      const item = { b64_json: 'Zg==', revised_prompt: prompt, quality: 'low' }
+      const payload = apiMode === 'images' ? { data: [item] } : { output: [{ ...item, type: 'image_generation_call', result: 'Zg==' }] }
+      return new Response(JSON.stringify(payload), { headers: { 'Content-Type': 'application/json' } })
+    })
+    const opts = {
+      settings: { ...DEFAULT_SETTINGS, apiMode, apiKey: 'test', model: apiMode === 'images' ? 'gpt-image-2.5-flare' : 'gpt-5.5' },
+      prompt: '画一个可爱的小狗', inputImageDataUrls: [],
+      params: { ...DEFAULT_PARAMS, size: '3840x1648', quality: 'high' as const },
+    }
+    const result = await callImageApi(opts)
+    const body = JSON.parse(String(fetchMock.mock.calls[0][1]?.body))
+    const prompt = apiMode === 'images' ? body.prompt : body.input
+    expect(prompt).toContain('Target canvas: 3840x1648')
+    expect(prompt).toContain('landscape')
+    expect(prompt).toContain('complete intended subject')
+    expect(opts.prompt).toBe('画一个可爱的小狗')
+    expect(opts.settings.model).toBe(apiMode === 'images' ? 'gpt-image-2.5-flare' : 'gpt-5.5')
+    expect(result.requestModel).toBe(apiMode === 'images' ? 'gpt-image-2.5-flare-4k' : 'gpt-5.5')
+    expect(result.revisedPrompts?.[0]).not.toContain('[Image canvas requirements]')
+    expect(result.revisedPrompts?.[0]).toContain(opts.prompt)
+  })
+
+  it('injects outpainting guidance into multipart edits without changing user content', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+      if (String(url).startsWith('data:')) return new Response(new Blob(['png'], { type: 'image/png' }))
+      return new Response(JSON.stringify({ data: [{ b64_json: 'Zg==' }] }), { headers: { 'Content-Type': 'application/json' } })
+    })
+    await callImageApi({
+      settings: { ...DEFAULT_SETTINGS, apiKey: 'test', model: 'gpt-image-2.5-sunburst' },
+      prompt: '保留小狗', inputImageDataUrls: ['data:image/png;base64,Zg=='],
+      params: { ...DEFAULT_PARAMS, size: '2560x1440', size_fit: 'none', quality: 'high' },
+    })
+    const form = fetchMock.mock.calls.find(([, init]) => init?.body instanceof FormData)![1]!.body as FormData
+    expect(form.get('model')).toBe('gpt-image-2.5-sunburst-2k')
+    expect(form.get('prompt')).toContain('outpaint the surrounding scene')
+    expect(form.get('prompt')).toContain('保留小狗')
+    expect(form.get('size')).toBe('2560x1440')
+    expect(form.get('quality')).toBe('high')
   })
 
   it.each([false, true])('fits the screenshot case only with explicit padding (stream=%s)', async (stream) => {
@@ -114,7 +158,7 @@ describe('callImageApi', () => {
     }), { headers: { 'Content-Type': 'application/json' } }))
     const result = await callImageApi({
       settings: { ...DEFAULT_SETTINGS, apiKey: 'test' }, prompt: 'a sticker', inputImageDataUrls: [],
-      params: { ...DEFAULT_PARAMS, transparent_output: true, transparent_method: 'local', size: '2048x2048', size_fit: 'none' },
+      params: { ...DEFAULT_PARAMS, transparent_output: true, transparent_method: 'local', size: '2048x2048', size_fit: 'none', quality: 'high' },
     })
     const body = JSON.parse(String(fetchMock.mock.calls[0][1]?.body))
     expect(body.prompt).toContain('#00FF00')

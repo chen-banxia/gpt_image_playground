@@ -2,9 +2,43 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { DEFAULT_PARAMS } from './types'
 import { DEFAULT_SETTINGS } from './lib/apiProfiles'
 import type { TaskRecord } from './types'
-import { editOutputs, markExpiredOpenAIRunningTasks, migrateImagePreferences, submitTask, useStore } from './store'
+import { createFilledOutput, editOutputs, markExpiredOpenAIRunningTasks, migrateImagePreferences, submitTask, useStore } from './store'
+import * as db from './lib/db'
+import * as exactImage from './lib/exactImageSize'
+import * as api from './lib/api'
 
 const imageA = { id: 'image-a', dataUrl: 'data:image/png;base64,a' }
+
+describe('filled output copy', () => {
+  it('keeps the padded original and creates a separate result without a generation request', async () => {
+    const original = task({
+      id: 'padded-task', outputImages: ['padded-image'],
+      params: { ...DEFAULT_PARAMS, size: '3840x1648', size_fit: 'pad' },
+      actualParamsByImage: { 'padded-image': { size: '3840x1648', source_size: '1254x1254', size_fit: 'pad', quality: 'low' } },
+    })
+    useStore.setState({ tasks: [original] })
+    const get = vi.spyOn(db, 'getImage').mockResolvedValue({ id: 'padded-image', dataUrl: 'padded' })
+    const store = vi.spyOn(db, 'storeImage').mockResolvedValue('filled-image')
+    const put = vi.spyOn(db, 'putTask').mockResolvedValue('new-task')
+    const resize = vi.spyOn(exactImage, 'applyExactImageSize').mockResolvedValue({ image: 'filled', sourceSize: '1254x1254', resized: true })
+    const generate = vi.spyOn(api, 'callImageApi')
+    try {
+      await createFilledOutput(original.id, 'padded-image')
+      expect(resize).toHaveBeenCalledWith('padded', expect.objectContaining({ size_fit: 'cover', size: '3840x1648' }), undefined, '1254x1254')
+      expect(generate).not.toHaveBeenCalled()
+      expect(store).toHaveBeenCalledWith('filled', 'generated')
+      expect(put).toHaveBeenCalledOnce()
+      const [copy, kept] = useStore.getState().tasks
+      expect(kept).toBe(original)
+      expect(copy.outputImages).toEqual(['filled-image'])
+      expect(copy.inputImageIds).toEqual(['padded-image'])
+      expect(copy.actualParams).toMatchObject({ size_fit: 'cover', size: '3840x1648', quality: 'low' })
+    } finally {
+      get.mockRestore(); store.mockRestore(); put.mockRestore(); resize.mockRestore(); generate.mockRestore()
+      useStore.setState({ tasks: [], detailTaskId: null })
+    }
+  })
+})
 
 describe('image upgrade preferences', () => {
   it.each([2, 3])('restores original output for stored version %s without changing model, quality or history', (version) => {

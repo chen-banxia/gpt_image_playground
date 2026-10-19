@@ -303,7 +303,7 @@ export default function SizePickerModal({ currentSize, currentFit = 'none', onSe
             <section className="space-y-2">
               <div className="text-xs font-medium text-gray-500 dark:text-gray-400">{t('sizeFitLabel')}</div>
               <div className="grid grid-cols-3 gap-2">
-                {(['none', 'pad', 'cover'] as const).map((value) => (
+                {(['none', 'cover', 'pad'] as const).map((value) => (
                   <button type="button" key={value} className={buttonClass(fit === value)} onClick={() => setFit(value)}>
                     {t(value === 'none' ? 'sizeFitNone' : value === 'pad' ? 'sizeFitPad' : 'sizeFitCover')}
                   </button>
