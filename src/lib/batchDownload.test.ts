@@ -16,6 +16,7 @@ describe('batch image download', () => {
     expect(Object.keys(files)).toEqual(['task-1/image-1.png', 'task-1/image-2.jpg', 'task-3/image-1.png'])
     expect([...files['task-1/image-1.png']]).toEqual([1, 2, 3])
     expect(result).toMatchObject({ count: 3, skipped: 1 })
+    expect(result.imageIds).toEqual(['a', 'b'])
   })
   it('rejects missing images instead of silently downloading an incomplete archive', async () => {
     await expect(buildSelectedImagesZip([task('first', ['missing'])], async () => undefined)).rejects.toThrow()

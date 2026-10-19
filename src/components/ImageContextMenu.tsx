@@ -2,10 +2,11 @@ import React, { useEffect, useState, useRef } from 'react'
 import { useStore, addImageFromUrl } from '../store'
 import { copyBlobToClipboard, getClipboardFailureMessage } from '../lib/clipboard'
 import { useT } from '../hooks/useI18n'
+import { downloadImage } from '../lib/downloadImage'
 
 export default function ImageContextMenu() {
   const t = useT()
-  const [menuInfo, setMenuInfo] = useState<{ src: string; x: number; y: number } | null>(null)
+  const [menuInfo, setMenuInfo] = useState<{ src: string; imageId?: string; x: number; y: number } | null>(null)
   const showToast = useStore((s) => s.showToast)
   const inputImages = useStore((s) => s.inputImages)
   const setDetailTaskId = useStore((s) => s.setDetailTaskId)
@@ -31,6 +32,7 @@ export default function ImageContextMenu() {
         e.preventDefault()
         setMenuInfo({
           src: imgTarget.src,
+          imageId: imgTarget.dataset.imageId,
           x: e.clientX,
           y: e.clientY,
         })
@@ -90,17 +92,9 @@ export default function ImageContextMenu() {
     e.stopPropagation()
     setMenuInfo(null)
     try {
-      const res = await fetch(menuInfo.src)
-      const blob = await res.blob()
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      const ext = blob.type.split('/')[1] || 'png'
-      a.download = `image-${Date.now()}.${ext}`
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(url)
+      await downloadImage(menuInfo.src, () => {
+        if (menuInfo.imageId) useStore.getState().markImagesDownloaded([menuInfo.imageId])
+      })
       showToast(t('downloadStarted'), 'success')
     } catch (err) {
       console.error(err)

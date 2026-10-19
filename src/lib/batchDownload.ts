@@ -6,6 +6,7 @@ import { tCurrent } from '../i18n'
 export async function buildSelectedImagesZip(tasks: TaskRecord[], readImage: (id: string) => Promise<string | undefined>) {
   const files: Record<string, Uint8Array> = {}
   let count = 0
+  const imageIds = new Set<string>()
   const skipped = tasks.filter((task) => task.outputImages.length === 0).length
   for (const [taskIndex, task] of tasks.entries()) {
     for (const [imageIndex, id] of task.outputImages.entries()) {
@@ -19,6 +20,7 @@ export async function buildSelectedImagesZip(tasks: TaskRecord[], readImage: (id
       // 序号保证同一任务多图和不同任务重复图片不会互相覆盖。
       files[`task-${taskIndex + 1}/image-${imageIndex + 1}.${extension}`] = bytes
       count++
+      imageIds.add(id)
     }
   }
   if (!count) throw new Error(tCurrent('batchNoImages'))
@@ -26,7 +28,7 @@ export async function buildSelectedImagesZip(tasks: TaskRecord[], readImage: (id
   const bytes = await new Promise<Uint8Array>((resolve, reject) => {
     zip(files, { level: 0 }, (error, result) => error ? reject(error) : resolve(result))
   })
-  return { bytes, count, skipped }
+  return { bytes, count, skipped, imageIds: [...imageIds] }
 }
 
 export function saveImagesZip(bytes: Uint8Array) {

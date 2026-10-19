@@ -1,4 +1,4 @@
-const CACHE_NAME = 'code-link-v0.3.7'
+const CACHE_NAME = 'code-link-v0.3.9'
 const APP_SHELL = ['./', './index.html', './manifest.webmanifest', './pwa-icon.svg']
 
 self.addEventListener('install', (event) => {

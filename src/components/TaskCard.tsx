@@ -4,6 +4,8 @@ import { useStore, getCachedImage, ensureImageCached, updateTaskInStore, retryTa
 import { useT } from '../hooks/useI18n'
 import GenerationPreview from './GenerationPreview'
 import { formatImageRatio } from '../lib/size'
+import DownloadBadge from './DownloadBadge'
+import { downloadImage } from '../lib/downloadImage'
 import { ParamValue } from '../lib/paramDisplay'
 
 interface Props {
@@ -24,6 +26,21 @@ export default function TaskCard({
   isSelected,
 }: Props) {
   const t = useT()
+  const [downloading, setDownloading] = useState(false)
+  const downloadBusy = useRef(false)
+  const handleDownloadCover = async () => {
+    const imageId = task.outputImages[0]
+    if (!imageId || downloadBusy.current) return
+    downloadBusy.current = true
+    setDownloading(true)
+    try {
+      const src = getCachedImage(imageId) ?? await ensureImageCached(imageId)
+      if (!src) throw new Error(t('downloadFailed'))
+      await downloadImage(src, () => useStore.getState().markImagesDownloaded([imageId]))
+      useStore.getState().showToast(t('downloadStarted'), 'success')
+    } catch { useStore.getState().showToast(t('downloadFailed'), 'error') }
+    finally { downloadBusy.current = false; setDownloading(false) }
+  }
   const previews = useStore((s) => s.taskPreviews[task.id])
   const [thumbSrc, setThumbSrc] = useState<string>('')
   const [coverRatio, setCoverRatio] = useState<string>('')
@@ -303,6 +320,7 @@ export default function TaskCard({
             <>
               <img
                 src={thumbSrc}
+                data-image-id={task.outputImages[0]}
                 className="saveable-image w-full h-full object-cover"
                 loading="lazy"
                 alt=""
@@ -376,6 +394,7 @@ export default function TaskCard({
               className="flex gap-1 justify-end flex-shrink-0"
               onClick={(e) => e.stopPropagation()}
             >
+              <DownloadBadge imageIds={task.outputImages} onDownload={handleDownloadCover} disabled={downloading} />
               {task.status === 'error' && !isFalReconnecting && (
                 <button
                   onClick={() => retryTask(task)}

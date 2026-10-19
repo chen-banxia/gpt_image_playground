@@ -87,6 +87,7 @@ export default function InputBar() {
     try {
       const result = await buildSelectedImagesZip(selectedTasks, ensureImageCached)
       saveImagesZip(result.bytes)
+      useStore.getState().markImagesDownloaded(result.imageIds)
       showToast(t('batchDownloadDone', { count: result.count, skipped: result.skipped }), 'success')
     } catch (error) {
       showToast(error instanceof Error ? error.message : t('downloadFailed'), 'error')

@@ -2,6 +2,9 @@ import { useEffect, useState, useRef, useCallback } from 'react'
 import { useStore, getCachedImage, ensureImageCached } from '../store'
 import { useCloseOnEscape } from '../hooks/useCloseOnEscape'
 import { createMaskPreviewDataUrl } from '../lib/canvasImage'
+import DownloadBadge from './DownloadBadge'
+import { downloadImage } from '../lib/downloadImage'
+import { useT } from '../hooks/useI18n'
 
 const MIN_SCALE = 1
 const MAX_SCALE = 10
@@ -18,6 +21,7 @@ export default function Lightbox() {
   const tasks = useStore((s) => s.tasks)
 
   const [src, setSrc] = useState('')
+  const [loadedImageId, setLoadedImageId] = useState<string | null>(null)
   const [maskImageSrc, setMaskImageSrc] = useState('')
   const [maskPreviewSrc, setMaskPreviewSrc] = useState('')
 
@@ -28,16 +32,23 @@ export default function Lightbox() {
   useEffect(() => {
     if (!lightboxImageId) {
       setSrc('')
+      setLoadedImageId(null)
       return
     }
+    let cancelled = false
     const cached = getCachedImage(lightboxImageId)
     if (cached) {
       setSrc(cached)
+      setLoadedImageId(lightboxImageId)
     } else {
       ensureImageCached(lightboxImageId).then((url) => {
-        if (url) setSrc(url)
+        if (url && !cancelled) {
+          setSrc(url)
+          setLoadedImageId(lightboxImageId)
+        }
       })
     }
+    return () => { cancelled = true }
   }, [lightboxImageId])
 
   // 遮罩图加载
@@ -113,10 +124,11 @@ export default function Lightbox() {
     return () => window.removeEventListener('keydown', onKey)
   }, [lightboxImageId, showNav, goPrev, goNext])
 
-  if (!lightboxImageId || !src) return null
+  if (!lightboxImageId || !src || loadedImageId !== lightboxImageId) return null
 
   return (
     <LightboxInner
+      imageId={lightboxImageId}
       src={src}
       maskPreviewSrc={maskPreviewSrc}
       onClose={close}
@@ -130,6 +142,7 @@ export default function Lightbox() {
 }
 
 interface LightboxInnerProps {
+  imageId: string
   src: string
   maskPreviewSrc?: string
   onClose: () => void
@@ -141,8 +154,29 @@ interface LightboxInnerProps {
 }
 
 /** 内部组件：保证挂载时 DOM 已经存在，所有 ref / effect 都可靠 */
-function LightboxInner({ src, maskPreviewSrc, onClose, showNav, currentIndex, total, onPrev, onNext }: LightboxInnerProps) {
+function LightboxInner({ imageId, src, maskPreviewSrc, onClose, showNav, currentIndex, total, onPrev, onNext }: LightboxInnerProps) {
+  const t = useT()
+  const [downloading, setDownloading] = useState(false)
+  const downloadingRef = useRef(false)
+  const downloaded = useStore((state) => Boolean(state.downloadedImages[imageId]))
   const containerRef = useRef<HTMLDivElement>(null)
+
+  const handleDownload = async () => {
+    if (downloadingRef.current) return
+    downloadingRef.current = true
+    setDownloading(true)
+    // 固定本次点击对应的图片；下载期间切换预览不会标错图片。
+    const selectedId = imageId
+    try {
+      await downloadImage(src, () => useStore.getState().markImagesDownloaded([selectedId]))
+      useStore.getState().showToast(t('downloadStarted'), 'success')
+    } catch {
+      useStore.getState().showToast(t('downloadFailed'), 'error')
+    } finally {
+      downloadingRef.current = false
+      setDownloading(false)
+    }
+  }
 
   // 用 ref 追踪最新变换，避免闭包过期
   const scaleRef = useRef(1)
@@ -257,6 +291,7 @@ function LightboxInner({ src, maskPreviewSrc, onClose, showNav, currentIndex, to
     if (!el) return
 
     const onDown = (e: MouseEvent) => {
+      if (e.target instanceof Element && e.target.closest('[data-preview-actions]')) return
       if (e.button !== 0) return
       didDragRef.current = false
       if (scaleRef.current <= 1) return
@@ -324,6 +359,7 @@ function LightboxInner({ src, maskPreviewSrc, onClose, showNav, currentIndex, to
     if (!el) return
 
     const onTouchStart = (e: TouchEvent) => {
+      if (e.target instanceof Element && e.target.closest('[data-preview-actions]')) return
       if (e.touches.length === 2) {
         e.preventDefault()
         hadMultiTouchRef.current = true
@@ -381,6 +417,7 @@ function LightboxInner({ src, maskPreviewSrc, onClose, showNav, currentIndex, to
     }
 
     const onTouchMove = (e: TouchEvent) => {
+      if (e.target instanceof Element && e.target.closest('[data-preview-actions]')) return
       if (pinchRef.current.active && e.touches.length === 2) {
         e.preventDefault()
         const [a, b] = [e.touches[0], e.touches[1]]
@@ -398,6 +435,7 @@ function LightboxInner({ src, maskPreviewSrc, onClose, showNav, currentIndex, to
     }
 
     const onTouchEnd = (e: TouchEvent) => {
+      if (e.target instanceof Element && e.target.closest('[data-preview-actions]')) return
       if (e.touches.length < 2) pinchRef.current.active = false
       if (e.touches.length === 0) {
         dragRef.current.active = false
@@ -450,6 +488,16 @@ function LightboxInner({ src, maskPreviewSrc, onClose, showNav, currentIndex, to
       onDoubleClick={onDoubleClick}
     >
       <div className="absolute inset-0 bg-black/70 backdrop-blur-md animate-fade-in" />
+      <div data-no-drag-select data-preview-actions className="absolute right-4 top-4 z-10 rounded-lg bg-gray-900/80"
+        onClick={(event) => event.stopPropagation()} onDoubleClick={(event) => event.stopPropagation()}>
+        <button type="button" onClick={handleDownload} disabled={downloading}
+          aria-label={t('download')} aria-busy={downloading}
+          title={`${t('download')} · ${t(downloaded ? 'imageDownloaded' : 'imageNotDownloaded')}`}
+          className="inline-flex min-h-10 items-center gap-1 rounded-lg px-2 py-1 text-xs text-white hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-400 disabled:opacity-50">
+          <DownloadBadge imageIds={[imageId]} decorative />
+          <span>{t('download')}</span>
+        </button>
+      </div>
       <div className="relative animate-zoom-in">
         <div
           className="relative flex items-center justify-center"
@@ -461,6 +509,7 @@ function LightboxInner({ src, maskPreviewSrc, onClose, showNav, currentIndex, to
         >
           <img
             src={src}
+            data-image-id={imageId}
             className="saveable-image max-w-[85vw] max-h-[85vh] object-contain rounded-lg shadow-2xl"
             onDragStart={(e) => e.preventDefault()}
             alt=""

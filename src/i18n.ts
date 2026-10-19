@@ -2,6 +2,10 @@ import type { Language } from './types'
 
 const translations = {
   en: {
+    imageDownloaded: 'Downloaded',
+    imageNotDownloaded: 'Not downloaded',
+    imagesPartDownloaded: 'Downloaded {count}/{total}',
+    downloadBadgeHint: 'Tracks downloads started from this page, not completion on disk. Browser-native Save Image actions cannot be detected.',
     batchActions: 'Batch actions',
     exitBatch: 'Done',
     selectRecord: 'Select record: {prompt}',
@@ -316,6 +320,10 @@ const translations = {
     clipboardEmbeddedDenied: 'Copy failed: clipboard permission is not granted in the embedded page',
   },
   zh: {
+    imageDownloaded: '已下载',
+    imageNotDownloaded: '未下载',
+    imagesPartDownloaded: '已下载 {count}/{total}',
+    downloadBadgeHint: '表示已通过页面发起下载，不代表已写入磁盘；浏览器原生“图片另存为”无法自动记录。',
     batchActions: '批量操作',
     exitBatch: '完成',
     selectRecord: '选择记录：{prompt}',

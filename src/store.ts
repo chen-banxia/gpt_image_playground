@@ -118,6 +118,9 @@ interface AppState {
   setFilterFavorite: (f: boolean) => void
 
   // 多选
+  /** 按图片 ID 记录页面发起下载的时间，同一图片在不同记录中共享标记。 */
+  downloadedImages: Record<string, number>
+  markImagesDownloaded: (ids: string[]) => void
   batchMode: boolean
   setBatchMode: (enabled: boolean) => void
   selectedTaskIds: string[]
@@ -305,6 +308,13 @@ export const useStore = create<AppState>()(
       setFilterFavorite: (filterFavorite) => set({ filterFavorite }),
 
       // Selection
+      downloadedImages: {},
+      markImagesDownloaded: (ids) => set((state) => {
+        const downloadedImages = { ...state.downloadedImages }
+        const now = Date.now()
+        for (const id of ids) if (id) downloadedImages[id] = now
+        return { downloadedImages }
+      }),
       batchMode: false,
       setBatchMode: (batchMode) => set({ batchMode, ...(!batchMode ? { selectedTaskIds: [] } : {}) }),
       selectedTaskIds: [],
@@ -361,6 +371,7 @@ export const useStore = create<AppState>()(
             }
         return {
           settings: sanitizedSettings,
+          downloadedImages: state.downloadedImages,
           params: state.params,
           prompt: state.prompt,
           inputImages: state.inputImages.map((img) => ({ id: img.id, dataUrl: '' })),
@@ -1146,7 +1157,7 @@ export async function clearAllData() {
   const { setTasks, clearInputImages, clearMaskDraft, setSettings, setParams, showToast } = useStore.getState()
   setTasks([])
   clearInputImages()
-  useStore.setState({ dismissedCodexCliPrompts: [] })
+  useStore.setState({ dismissedCodexCliPrompts: [], downloadedImages: {} })
   clearMaskDraft()
   setSettings({ ...DEFAULT_SETTINGS })
   setParams({ ...DEFAULT_PARAMS })

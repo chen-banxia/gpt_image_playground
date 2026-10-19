@@ -3,6 +3,8 @@ import { useStore, getCachedImage, ensureImageCached, reuseConfig, editOutputs, 
 import { useCloseOnEscape } from '../hooks/useCloseOnEscape'
 import { useLanguage, useT } from '../hooks/useI18n'
 import GenerationPreview from './GenerationPreview'
+import DownloadBadge from './DownloadBadge'
+import { downloadImage } from '../lib/downloadImage'
 import { formatImageRatio, parseOutputSize } from '../lib/size'
 import { ActualValueBadge, DetailParamValue } from '../lib/paramDisplay'
 import { copyBlobToClipboard, copyTextToClipboard, getClipboardFailureMessage } from '../lib/clipboard'
@@ -24,6 +26,7 @@ export default function DetailModal() {
 
   const [imageIndex, setImageIndex] = useState(0)
   const [filling, setFilling] = useState(false)
+  const [downloading, setDownloading] = useState(false)
   const [imageSrcs, setImageSrcs] = useState<Record<string, string>>({})
   const [imageRatios, setImageRatios] = useState<Record<string, string>>({})
   const [imageSizes, setImageSizes] = useState<Record<string, string>>({})
@@ -303,6 +306,7 @@ export default function DetailModal() {
               <img
                 ref={mainImageRef}
                 src={currentOutputImageSrc}
+                data-image-id={currentOutputImageId}
                 className="saveable-image max-w-[calc(100%-2rem)] max-h-[calc(100%-2rem)] object-contain cursor-pointer"
                 onLoad={() => {
                   const panel = imagePanelRef.current
@@ -636,6 +640,20 @@ export default function DetailModal() {
               {formatDuration() && <span> · {t('elapsed', { duration: formatDuration() ?? '' })}</span>}
             </div>
           </div>
+
+          {task.status === 'done' && currentOutputImageSrc && (
+              <div className="mb-3 flex items-center justify-end gap-2">
+                <button type="button" disabled={downloading} className="inline-flex items-center gap-1 rounded-lg bg-gray-100 px-3 py-2 text-xs text-gray-600 hover:bg-gray-200 disabled:opacity-50 dark:bg-white/[0.06] dark:text-gray-300"
+                  onClick={async () => {
+                    setDownloading(true)
+                    try {
+                      await downloadImage(currentOutputImageSrc, () => useStore.getState().markImagesDownloaded([currentOutputImageId]))
+                      showToast(t('downloadStarted'), 'success')
+                    } catch { showToast(t('downloadFailed'), 'error') }
+                    finally { setDownloading(false) }
+                  }}><DownloadBadge imageIds={[currentOutputImageId]} decorative />{t('download')}</button>
+              </div>
+          )}
 
           {/* 操作按钮 */}
           <div className="grid grid-cols-4 sm:flex gap-2 pt-4 border-t border-gray-100 dark:border-white/[0.08]">
