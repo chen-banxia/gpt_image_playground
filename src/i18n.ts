@@ -2,6 +2,15 @@ import type { Language } from './types'
 
 const translations = {
   en: {
+    batchActions: 'Batch actions',
+    exitBatch: 'Done',
+    selectRecord: 'Select record: {prompt}',
+    batchSelected: '{count} selected · {images} images',
+    batchDownload: 'Download ZIP',
+    batchDownloading: 'Preparing ZIP…',
+    batchDownloadDone: 'Downloading {count} images; skipped {skipped} records without outputs.',
+    batchImageMissing: 'A selected image is missing or unreadable. No ZIP was downloaded.',
+    batchNoImages: 'The selected records have no output images to download.',
     sizeFitLabel: 'Final output size',
     sizeFitNone: 'Original',
     sizeFitPad: 'Transparent pad',
@@ -307,6 +316,15 @@ const translations = {
     clipboardEmbeddedDenied: 'Copy failed: clipboard permission is not granted in the embedded page',
   },
   zh: {
+    batchActions: '批量操作',
+    exitBatch: '完成',
+    selectRecord: '选择记录：{prompt}',
+    batchSelected: '已选 {count} 条 · {images} 张图片',
+    batchDownload: '打包下载',
+    batchDownloading: '正在打包…',
+    batchDownloadDone: '开始下载 {count} 张图片，跳过 {skipped} 条无成品记录。',
+    batchImageMissing: '选中的图片有缺失或无法读取，未生成下载包。',
+    batchNoImages: '选中的记录没有可下载的成品图片。',
     sizeFitLabel: '最终尺寸处理',
     sizeFitNone: '保留原图',
     sizeFitPad: '透明补边',

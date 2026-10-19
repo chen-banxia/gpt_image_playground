@@ -118,6 +118,8 @@ interface AppState {
   setFilterFavorite: (f: boolean) => void
 
   // 多选
+  batchMode: boolean
+  setBatchMode: (enabled: boolean) => void
   selectedTaskIds: string[]
   setSelectedTaskIds: (ids: string[] | ((prev: string[]) => string[])) => void
   toggleTaskSelection: (id: string, force?: boolean) => void
@@ -303,6 +305,8 @@ export const useStore = create<AppState>()(
       setFilterFavorite: (filterFavorite) => set({ filterFavorite }),
 
       // Selection
+      batchMode: false,
+      setBatchMode: (batchMode) => set({ batchMode, ...(!batchMode ? { selectedTaskIds: [] } : {}) }),
       selectedTaskIds: [],
       setSelectedTaskIds: (updater) => set((s) => ({
         selectedTaskIds: typeof updater === 'function' ? updater(s.selectedTaskIds) : updater

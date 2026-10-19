@@ -10,9 +10,11 @@ export default function SearchBar() {
   const setFilterStatus = useStore((s) => s.setFilterStatus)
   const filterFavorite = useStore((s) => s.filterFavorite)
   const setFilterFavorite = useStore((s) => s.setFilterFavorite)
+  const batchMode = useStore((s) => s.batchMode)
+  const setBatchMode = useStore((s) => s.setBatchMode)
 
   return (
-    <div data-no-drag-select className="mt-6 mb-4 flex gap-3">
+    <div data-no-drag-select className="mt-6 mb-4 flex flex-wrap gap-3">
       <div className="flex gap-2 flex-shrink-0 z-20">
         <button
           onClick={() => setFilterFavorite(!filterFavorite)}
@@ -41,7 +43,7 @@ export default function SearchBar() {
           />
         </div>
       </div>
-      <div className="relative flex-1 z-10">
+      <div className="relative flex-1 min-w-[120px] z-10">
         <svg
           className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500"
           fill="none"
@@ -63,6 +65,10 @@ export default function SearchBar() {
           className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 dark:border-white/[0.08] bg-white dark:bg-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition"
         />
       </div>
+      <button type="button" onClick={() => setBatchMode(!batchMode)} aria-pressed={batchMode}
+        className={`rounded-xl border px-3 py-2 text-sm font-medium ${batchMode ? 'border-blue-400 bg-blue-50 text-blue-600 dark:bg-blue-500/10' : 'border-gray-200 bg-white text-gray-600 dark:border-white/[0.08] dark:bg-gray-900 dark:text-gray-300'}`}>
+        {t(batchMode ? 'exitBatch' : 'batchActions')}
+      </button>
     </div>
   )
 }

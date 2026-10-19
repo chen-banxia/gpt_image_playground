@@ -12,6 +12,7 @@ export default function TaskGrid() {
   const setDetailTaskId = useStore((s) => s.setDetailTaskId)
   const setConfirmDialog = useStore((s) => s.setConfirmDialog)
   const selectedTaskIds = useStore((s) => s.selectedTaskIds)
+  const batchMode = useStore((s) => s.batchMode)
   const setSelectedTaskIds = useStore((s) => s.setSelectedTaskIds)
   const clearSelection = useStore((s) => s.clearSelection)
   const rootRef = useRef<HTMLDivElement>(null)
@@ -202,7 +203,15 @@ export default function TaskGrid() {
     >
       <div ref={gridRef} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pb-10">
         {filteredTasks.map((task) => (
-          <div key={task.id} className="task-card-wrapper" data-task-id={task.id}>
+          <div key={task.id} className="task-card-wrapper relative" data-task-id={task.id}>
+            {batchMode && (
+              <label data-no-drag-select className="absolute top-2 right-2 z-20 flex h-7 w-7 items-center justify-center rounded-lg bg-white/90 shadow dark:bg-gray-800/90"
+                onClick={(event) => event.stopPropagation()}>
+                <input type="checkbox" checked={selectedTaskIds.includes(task.id)}
+                  onChange={() => useStore.getState().toggleTaskSelection(task.id)}
+                  aria-label={t('selectRecord', { prompt: task.prompt })} className="h-4 w-4 accent-blue-500" />
+              </label>
+            )}
             <TaskCard
               task={task}
               onClick={(e) => {
@@ -212,7 +221,7 @@ export default function TaskGrid() {
                 }
                 suppressClickUntil.current = 0
                 const isCtrl = isMac ? e.metaKey : e.ctrlKey
-                if (isCtrl) {
+                if (isCtrl || batchMode) {
                   useStore.getState().toggleTaskSelection(task.id)
                 } else if (selectedTaskIds.length > 0) {
                   clearSelection()

@@ -2,12 +2,39 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { DEFAULT_PARAMS } from './types'
 import { DEFAULT_SETTINGS } from './lib/apiProfiles'
 import type { TaskRecord } from './types'
-import { createFilledOutput, editOutputs, markExpiredOpenAIRunningTasks, migrateImagePreferences, submitTask, useStore } from './store'
+import { createFilledOutput, editOutputs, markExpiredOpenAIRunningTasks, migrateImagePreferences, removeMultipleTasks, submitTask, useStore } from './store'
 import * as db from './lib/db'
 import * as exactImage from './lib/exactImageSize'
 import * as api from './lib/api'
 
 const imageA = { id: 'image-a', dataUrl: 'data:image/png;base64,a' }
+
+describe('batch record operations', () => {
+  it('deletes selected records while preserving shared and current input images', async () => {
+    const removed = task({ id: 'remove', inputImageIds: ['shared', 'current-input'], outputImages: ['unused'] })
+    const kept = task({ id: 'keep', inputImageIds: ['shared'] })
+    const deleteTask = vi.spyOn(db, 'deleteTask').mockResolvedValue(undefined)
+    const deleteImage = vi.spyOn(db, 'deleteImage').mockResolvedValue(undefined)
+    useStore.setState({ tasks: [removed, kept], inputImages: [{ id: 'current-input', dataUrl: '' }], selectedTaskIds: ['remove', 'keep'] })
+    const toast = vi.spyOn(useStore.getState(), 'showToast').mockImplementation(() => {})
+    try {
+      await removeMultipleTasks(['remove'])
+      expect(deleteTask).toHaveBeenCalledWith('remove')
+      expect(deleteImage).toHaveBeenCalledExactlyOnceWith('unused')
+      expect(useStore.getState().tasks).toEqual([kept])
+      expect(useStore.getState().selectedTaskIds).toEqual(['keep'])
+    } finally {
+      deleteTask.mockRestore(); deleteImage.mockRestore(); toast.mockRestore()
+      useStore.setState({ tasks: [], inputImages: [], selectedTaskIds: [] })
+    }
+  })
+  it('exits batch mode and clears selection', () => {
+    useStore.setState({ batchMode: true, selectedTaskIds: ['record'] })
+    useStore.getState().setBatchMode(false)
+    expect(useStore.getState().batchMode).toBe(false)
+    expect(useStore.getState().selectedTaskIds).toEqual([])
+  })
+})
 
 describe('filled output copy', () => {
   it('keeps the padded original and creates a separate result without a generation request', async () => {
