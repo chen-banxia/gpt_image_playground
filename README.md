@@ -2,7 +2,7 @@
 
 基于 OpenAI 图像生成接口的图片生成与编辑工具。提供简洁精美的 Web UI，支持文本生图、参考图与遮罩编辑，数据纯本地化存储，带来流畅的历史记录与参数管理体验。
 
-当前版本 v0.3.3：默认使用 GPT Image 2.5 Sunburst / high，尺寸默认保留网关原图，支持 codex2api 2K/4K 别名、可选的本地补边和裁剪、原生透明背景、本地抠图和流式预览。配置与行为详见 [生图升级说明](docs/image-upgrade.md)。
+当前版本 v0.3.6：默认使用 GPT Image 2.5 Sunburst / auto，尺寸默认保留网关原图，支持 codex2api 2K/4K 别名、可选的本地补边和裁剪、原生透明背景、本地抠图和流式预览。配置与行为详见 [生图升级说明](docs/image-upgrade.md)。
 
 > 若需调用非 HTTPS 的内网或本地 HTTP API，请使用 GitHub Pages 版本或自行部署，Vercel 部署的体验版绑定的 `.dev` 域名因安全策略通常要求接口必须为 HTTPS。
 
