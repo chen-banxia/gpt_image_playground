@@ -86,8 +86,15 @@ export interface MaskDraft {
 
 export type TaskStatus = 'running' | 'done' | 'error'
 
+export interface ImageGroup {
+  id: string
+  name: string
+}
+
 export interface TaskRecord {
   id: string
+  /** 在提交时固定所属分组，切换筛选不改变任务归属。 */
+  groupId?: string | null
   prompt: string
   params: TaskParams
   /** 生成时使用的 Provider 类型 */
@@ -224,6 +231,7 @@ export interface FalApiResponse {
 
 /** ZIP manifest.json 格式 */
 export interface ExportData {
+  groups?: ImageGroup[]
   version: number
   exportedAt: string
   settings: AppSettings

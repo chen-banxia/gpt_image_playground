@@ -5,6 +5,7 @@ import { useT } from '../hooks/useI18n'
 import GenerationPreview from './GenerationPreview'
 import { formatImageRatio } from '../lib/size'
 import DownloadBadge from './DownloadBadge'
+import GroupPicker from './GroupPicker'
 import { downloadImage } from '../lib/downloadImage'
 import { ParamValue } from '../lib/paramDisplay'
 
@@ -371,6 +372,7 @@ export default function TaskCard({
 
         {/* 右侧信息区域 */}
         <div className="flex-1 p-3 flex flex-col min-w-0">
+          <div data-no-drag-select className="mb-1" onClick={(event) => event.stopPropagation()}><GroupPicker taskIds={[task.id]} /></div>
           <div className="flex-1 min-h-0 mb-2">
             <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed line-clamp-3">
               {task.prompt || t('noPrompt')}

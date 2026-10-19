@@ -11,6 +11,8 @@ import { createMaskPreviewDataUrl } from '../lib/canvasImage'
 import { useT } from '../hooks/useI18n'
 import Select from './Select'
 import SizePickerModal from './SizePickerModal'
+import GroupPicker from './GroupPicker'
+import { filterGalleryTasks } from '../lib/taskGroups'
 import ViewportTooltip from './ViewportTooltip'
 
 /** 通用悬浮气泡提示 */
@@ -60,22 +62,12 @@ export default function InputBar() {
   const filterStatus = useStore((s) => s.filterStatus)
   const filterFavorite = useStore((s) => s.filterFavorite)
   const searchQuery = useStore((s) => s.searchQuery)
+  const groups = useStore((s) => s.groups)
+  const groupFilter = useStore((s) => s.groupFilter)
 
   const filteredTasks = useMemo(() => {
-    const sorted = [...tasks].sort((a, b) => b.createdAt - a.createdAt)
-    const q = searchQuery.trim().toLowerCase()
-    
-    return sorted.filter((t) => {
-      if (filterFavorite && !t.isFavorite) return false
-      const matchStatus = filterStatus === 'all' || t.status === filterStatus
-      if (!matchStatus) return false
-      
-      if (!q) return true
-      const prompt = (t.prompt || '').toLowerCase()
-      const paramStr = JSON.stringify(t.params).toLowerCase()
-      return prompt.includes(q) || paramStr.includes(q)
-    })
-  }, [tasks, searchQuery, filterStatus, filterFavorite])
+    return filterGalleryTasks(tasks, groups, groupFilter, searchQuery, filterStatus, filterFavorite)
+  }, [tasks, groups, groupFilter, searchQuery, filterStatus, filterFavorite])
 
   const allVisibleSelected = filteredTasks.length > 0 && filteredTasks.every((task) => selectedTaskIds.includes(task.id))
   const selectedTasks = tasks.filter((task) => selectedTaskIds.includes(task.id))
@@ -1214,6 +1206,7 @@ export default function InputBar() {
           <div data-no-drag-select className="mb-3 flex justify-center">
             <div className="flex max-w-full flex-wrap items-center justify-center gap-1 rounded-2xl border border-white/10 bg-gray-800/95 p-2 text-xs text-white shadow-lg backdrop-blur" role="toolbar" aria-label={t('batchActions')}>
               <span className="px-2" aria-live="polite">{t('batchSelected', { count: selectedTasks.length, images: imageCount })}</span>
+              <GroupPicker taskIds={selectedTaskIds} batch />
               <button type="button" onClick={handleSelectAllToggle} className="rounded-lg px-2 py-2 text-blue-300 hover:bg-white/10">
                 {t(allVisibleSelected ? 'cancelSelectAll' : 'selectAllVisible')}
               </button>

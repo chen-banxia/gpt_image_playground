@@ -4,6 +4,7 @@ import { useCloseOnEscape } from '../hooks/useCloseOnEscape'
 import { useLanguage, useT } from '../hooks/useI18n'
 import GenerationPreview from './GenerationPreview'
 import DownloadBadge from './DownloadBadge'
+import GroupPicker from './GroupPicker'
 import { downloadImage } from '../lib/downloadImage'
 import { formatImageRatio, parseOutputSize } from '../lib/size'
 import { ActualValueBadge, DetailParamValue } from '../lib/paramDisplay'
@@ -548,6 +549,7 @@ export default function DetailModal() {
             )}
 
             {/* 参数 */}
+            <div className="mb-3 flex items-center justify-between gap-2"><span className="text-xs text-gray-500">{t('imageGroup')}</span><GroupPicker taskIds={[task.id]} /></div>
             <h3 className="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-2">
               {t('parameterConfig')}
             </h3>

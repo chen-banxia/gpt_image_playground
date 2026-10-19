@@ -49,6 +49,24 @@ export function putTask(task: TaskRecord): Promise<IDBValidKey> {
   return dbTransaction(STORE_TASKS, 'readwrite', (s) => s.put(task))
 }
 
+/** 仅修改分组字段，不用旧任务快照覆盖并发完成时写入的图片、状态和用量。 */
+export async function putTaskGroups(ids: string[], groupId: string | null): Promise<void> {
+  const db = await openDB()
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_TASKS, 'readwrite')
+    const store = tx.objectStore(STORE_TASKS)
+    for (const id of new Set(ids)) {
+      const request = store.get(id)
+      request.onsuccess = () => {
+        if (request.result) store.put({ ...request.result, groupId })
+      }
+    }
+    tx.oncomplete = () => { db.close(); resolve() }
+    tx.onerror = () => { db.close(); reject(tx.error) }
+    tx.onabort = () => { db.close(); reject(tx.error) }
+  })
+}
+
 export function deleteTask(id: string): Promise<undefined> {
   return dbTransaction(STORE_TASKS, 'readwrite', (s) => s.delete(id))
 }

@@ -8,12 +8,14 @@ import type {
   MaskDraft,
   TaskRecord,
   ExportData,
+  ImageGroup,
 } from './types'
 import { DEFAULT_PARAMS } from './types'
 import { DEFAULT_SETTINGS, getActiveApiProfile, mergeImportedSettings, migrateLegacyDefaultImagesModel, normalizeSettings, validateApiProfile } from './lib/apiProfiles'
 import {
   getAllTasks,
   putTask,
+  putTaskGroups,
   deleteTask as dbDeleteTask,
   clearTasks as dbClearTasks,
   getImage,
@@ -32,6 +34,7 @@ import { orderInputImagesForMask } from './lib/mask'
 import { getChangedParams, normalizeParamsForSettings } from './lib/paramCompatibility'
 import { zipSync, unzipSync, strToU8, strFromU8 } from 'fflate'
 import { translate, type TranslationKey } from './i18n'
+import { resolveTaskGroup } from './lib/taskGroups'
 
 // ===== Image cache =====
 // 内存缓存，id → dataUrl，避免每次从 IndexedDB 读取
@@ -77,6 +80,9 @@ function orderImagesWithMaskFirst(images: InputImage[], maskTargetImageId: strin
 // ===== Store 类型 =====
 
 interface AppState {
+  groups: ImageGroup[]
+  groupFilter: string
+  setGroupFilter: (id: string) => void
   // 设置
   settings: AppSettings
   setSettings: (s: Partial<AppSettings>) => void
@@ -300,6 +306,10 @@ export const useStore = create<AppState>()(
       setTasks: (tasks) => set({ tasks }),
 
       // Search & Filter
+      groups: [],
+      groupFilter: 'all',
+      // 只变更视图，绝不取消请求或重置生成状态。
+      setGroupFilter: (groupFilter) => set({ groupFilter, selectedTaskIds: [] }),
       searchQuery: '',
       setSearchQuery: (searchQuery) => set({ searchQuery }),
       filterStatus: 'all',
@@ -372,6 +382,7 @@ export const useStore = create<AppState>()(
         return {
           settings: sanitizedSettings,
           downloadedImages: state.downloadedImages,
+          groups: state.groups,
           params: state.params,
           prompt: state.prompt,
           inputImages: state.inputImages.map((img) => ({ id: img.id, dataUrl: '' })),
@@ -688,6 +699,8 @@ export async function initStore() {
 
 /** 提交新任务 */
 export async function submitTask(options: { allowFullMask?: boolean } = {}) {
+  // 在任何 await 前固定分组；准备参考图期间用户切换页面也不改变归属。
+  const submittedGroupId = resolveTaskGroup(useStore.getState().groupFilter, useStore.getState().groups)
   const { settings, prompt, inputImages, maskDraft, params, showToast, setConfirmDialog } =
     useStore.getState()
 
@@ -750,6 +763,7 @@ export async function submitTask(options: { allowFullMask?: boolean } = {}) {
   const taskId = genId()
   const task: TaskRecord = {
     id: taskId,
+    groupId: resolveTaskGroup(submittedGroupId, useStore.getState().groups),
     prompt: prompt.trim(),
     params: normalizedParams,
     apiProvider: activeProfile.provider,
@@ -958,6 +972,7 @@ export async function retryTask(task: TaskRecord) {
   const taskId = genId()
   const newTask: TaskRecord = {
     id: taskId,
+    groupId: resolveTaskGroup(task.groupId, useStore.getState().groups),
     prompt: task.prompt,
     params: normalizedParams,
     apiProvider: activeProfile.provider,
@@ -1000,6 +1015,7 @@ export async function createFilledOutput(taskId: string, imageId: string) {
   }
   const copy: TaskRecord = {
     id: genId(), prompt: task.prompt, params,
+    groupId: resolveTaskGroup(task.groupId, useStore.getState().groups),
     apiProvider: task.apiProvider, apiProfileName: task.apiProfileName,
     apiModel: task.apiModel, apiImageModel: task.apiImageModel,
     // 保留来源图片引用，使清理历史记录时仍能保护副本依赖的原图。
@@ -1044,6 +1060,39 @@ export async function reuseConfig(task: TaskRecord) {
     clearMaskDraft()
   }
   showToast(tr('reusedConfigToast'), 'success')
+}
+
+export function saveImageGroup(name: string, id?: string) {
+  const trimmed = name.trim()
+  if (!trimmed || trimmed.length > 40) throw new Error(tr('groupNameInvalid'))
+  const groups = useStore.getState().groups
+  if (groups.some((group) => group.id !== id && group.name.toLowerCase() === trimmed.toLowerCase())) throw new Error(tr('groupNameDuplicate'))
+  const groupId = id ?? `group-${genId()}`
+  useStore.setState({ groups: id ? groups.map((group) => group.id === id ? { ...group, name: trimmed } : group) : [...groups, { id: groupId, name: trimmed }] })
+  return groupId
+}
+
+export async function assignTaskGroup(ids: string[], groupId: string | null) {
+  if (groupId && !useStore.getState().groups.some((group) => group.id === groupId)) throw new Error(tr('groupMissing'))
+  const selected = new Set(ids)
+  // 先更新当前内存，后续任务完成的增量写入会携带最新分组；数据库只补丁更新分组字段。
+  useStore.setState((state) => ({
+    tasks: state.tasks.map((task) => selected.has(task.id) ? { ...task, groupId } : task),
+    // 移动后可能离开当前筛选，清除这些选中项，避免后续删除隐藏记录。
+    selectedTaskIds: state.selectedTaskIds.filter((id) => !selected.has(id)),
+  }))
+  await putTaskGroups(ids, groupId)
+}
+
+export async function deleteImageGroup(id: string) {
+  const ids = useStore.getState().tasks.filter((task) => task.groupId === id).map((task) => task.id)
+  // 先移除分组，阻止正在准备中的新任务落到已删除分组。
+  useStore.setState((state) => ({
+    groups: state.groups.filter((group) => group.id !== id),
+    groupFilter: state.groupFilter === id ? 'ungrouped' : state.groupFilter,
+    selectedTaskIds: [],
+  }))
+  await assignTaskGroup(ids, null)
 }
 
 /** 编辑输出：将输出图加入输入 */
@@ -1157,7 +1206,7 @@ export async function clearAllData() {
   const { setTasks, clearInputImages, clearMaskDraft, setSettings, setParams, showToast } = useStore.getState()
   setTasks([])
   clearInputImages()
-  useStore.setState({ dismissedCodexCliPrompts: [], downloadedImages: {} })
+  useStore.setState({ dismissedCodexCliPrompts: [], downloadedImages: {}, groups: [], groupFilter: 'all', selectedTaskIds: [] })
   clearMaskDraft()
   setSettings({ ...DEFAULT_SETTINGS })
   setParams({ ...DEFAULT_PARAMS })
@@ -1222,6 +1271,7 @@ export async function exportData() {
       version: 2,
       exportedAt: new Date(exportedAt).toISOString(),
       settings,
+      groups: useStore.getState().groups,
       tasks,
       imageFiles,
     }
@@ -1268,8 +1318,19 @@ export async function importData(file: File): Promise<boolean> {
       imageCache.set(id, dataUrl)
     }
 
+    const groups = [...useStore.getState().groups]
+    // 同名分组合并；同 ID 不同名时生成新 ID，再重映射导入任务，避免覆盖本地分组。
+    const groupIds = new Map<string, string>()
+    for (const group of data.groups ?? []) {
+      if (!group?.id || typeof group.name !== 'string' || !group.name.trim()) continue
+      const existing = groups.find((item) => item.name === group.name)
+      const id = existing?.id ?? (groups.some((item) => item.id === group.id) ? `group-${genId()}` : group.id)
+      if (!existing) groups.push({ id, name: group.name.trim().slice(0, 40) })
+      groupIds.set(group.id, id)
+    }
+    useStore.setState({ groups })
     for (const task of data.tasks) {
-      await putTask(task)
+      await putTask({ ...task, groupId: task.groupId ? groupIds.get(task.groupId) ?? null : null })
     }
 
     if (data.settings) {

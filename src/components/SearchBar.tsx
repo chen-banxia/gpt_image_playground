@@ -1,6 +1,8 @@
 import { useStore } from '../store'
 import { useT } from '../hooks/useI18n'
 import Select from './Select'
+import { useState } from 'react'
+import GroupManager from './GroupManager'
 
 export default function SearchBar() {
   const t = useT()
@@ -12,9 +14,25 @@ export default function SearchBar() {
   const setFilterFavorite = useStore((s) => s.setFilterFavorite)
   const batchMode = useStore((s) => s.batchMode)
   const setBatchMode = useStore((s) => s.setBatchMode)
+  const groups = useStore((s) => s.groups)
+  const groupFilter = useStore((s) => s.groupFilter)
+  const setGroupFilter = useStore((s) => s.setGroupFilter)
+  const tasks = useStore((s) => s.tasks)
+  const [managingGroups, setManagingGroups] = useState(false)
 
   return (
     <div data-no-drag-select className="mt-6 mb-4 flex flex-wrap gap-3">
+      <div className="flex w-full flex-wrap items-center gap-2">
+        <select aria-label={t('filterGroup')} value={groupFilter} onChange={(event) => setGroupFilter(event.target.value)}
+          className="max-w-[240px] rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm dark:border-white/10 dark:bg-gray-900">
+          <option value="all">{t('allGroups')} ({tasks.length})</option>
+          <option value="ungrouped">{t('ungrouped')} ({tasks.filter((task) => !groups.some((group) => group.id === task.groupId)).length})</option>
+          {groups.map((group) => <option key={group.id} value={group.id}>{group.name} ({tasks.filter((task) => task.groupId === group.id).length})</option>)}
+        </select>
+        <button type="button" className="rounded-lg px-3 py-2 text-sm text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-500/10" onClick={() => setManagingGroups(true)}>{t('manageGroups')}</button>
+        <span className="text-xs text-gray-500">{t('newTaskGroupHint', { name: groups.find((group) => group.id === groupFilter)?.name ?? t('ungrouped') })}</span>
+      </div>
+      {managingGroups && <GroupManager onClose={() => setManagingGroups(false)} />}
       <div className="flex gap-2 flex-shrink-0 z-20">
         <button
           onClick={() => setFilterFavorite(!filterFavorite)}

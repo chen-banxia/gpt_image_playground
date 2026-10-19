@@ -12,6 +12,7 @@ it('persists download markers per image and restores them after a store reload',
   vi.stubGlobal('window', { localStorage: globalThis.localStorage })
   vi.resetModules()
   const first = (await import('../store')).useStore
+  first.setState({ groups: [{ id: 'group-a', name: '作品' }] })
   first.getState().markImagesDownloaded(['image-a', 'image-b', 'image-a'])
   const saved = JSON.parse(storage.get('gpt-image-playground')!)
   expect(Object.keys(saved.state.downloadedImages)).toEqual(['image-a', 'image-b'])
@@ -19,5 +20,6 @@ it('persists download markers per image and restores them after a store reload',
   vi.resetModules()
   const restored = (await import('../store')).useStore
   expect(restored.getState().downloadedImages).toEqual(saved.state.downloadedImages)
+  expect(restored.getState().groups).toEqual([{ id: 'group-a', name: '作品' }])
   expect(restored.getState().downloadedImages['not-downloaded']).toBeUndefined()
 })

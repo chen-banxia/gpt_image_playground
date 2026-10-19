@@ -2,6 +2,7 @@ import { useMemo, useRef, useState, useEffect } from 'react'
 import { useStore, reuseConfig, editOutputs, removeTask } from '../store'
 import { useT } from '../hooks/useI18n'
 import TaskCard from './TaskCard'
+import { filterGalleryTasks } from '../lib/taskGroups'
 
 export default function TaskGrid() {
   const t = useT()
@@ -9,6 +10,8 @@ export default function TaskGrid() {
   const searchQuery = useStore((s) => s.searchQuery)
   const filterStatus = useStore((s) => s.filterStatus)
   const filterFavorite = useStore((s) => s.filterFavorite)
+  const groups = useStore((s) => s.groups)
+  const groupFilter = useStore((s) => s.groupFilter)
   const setDetailTaskId = useStore((s) => s.setDetailTaskId)
   const setConfirmDialog = useStore((s) => s.setConfirmDialog)
   const selectedTaskIds = useStore((s) => s.selectedTaskIds)
@@ -28,20 +31,8 @@ export default function TaskGrid() {
   const isMac = /Mac|iPod|iPhone|iPad/.test(navigator.platform)
 
   const filteredTasks = useMemo(() => {
-    const sorted = [...tasks].sort((a, b) => b.createdAt - a.createdAt)
-    const q = searchQuery.trim().toLowerCase()
-    
-    return sorted.filter((t) => {
-      if (filterFavorite && !t.isFavorite) return false
-      const matchStatus = filterStatus === 'all' || t.status === filterStatus
-      if (!matchStatus) return false
-      
-      if (!q) return true
-      const prompt = (t.prompt || '').toLowerCase()
-      const paramStr = JSON.stringify(t.params).toLowerCase()
-      return prompt.includes(q) || paramStr.includes(q)
-    })
-  }, [tasks, searchQuery, filterStatus, filterFavorite])
+    return filterGalleryTasks(tasks, groups, groupFilter, searchQuery, filterStatus, filterFavorite)
+  }, [tasks, groups, groupFilter, searchQuery, filterStatus, filterFavorite])
 
   const handleDelete = (task: typeof tasks[0]) => {
     setConfirmDialog({
@@ -171,7 +162,7 @@ export default function TaskGrid() {
   if (!filteredTasks.length) {
     return (
       <div className="text-center py-20 text-gray-400 dark:text-gray-500">
-        {searchQuery || filterFavorite ? (
+        {searchQuery || filterFavorite || groupFilter !== 'all' ? (
           <p className="text-sm">{t('noMatches')}</p>
         ) : (
           <>
