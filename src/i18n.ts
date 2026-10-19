@@ -68,7 +68,7 @@ const translations = {
     apiConfig: 'API configuration',
     queryApiKeyHint: 'Can be overridden with query parameter:',
     rememberApiKey: 'Remember API Key',
-    rememberApiKeyHint: 'Disabled by default. When enabled, the key is saved locally in this browser.',
+    rememberApiKeyHint: 'Enabled by default. The key is saved in this browser across reloads until site data is cleared. Turn off to stop saving it.',
     requestTimeoutSeconds: 'Request timeout (seconds)',
     requestTimeoutHint: 'Abort image requests after this time. The new-api relay supports at most {seconds} seconds.',
     dataManagement: 'Data management',
@@ -142,8 +142,8 @@ const translations = {
     modelDescGptImage25: 'Newer generation, better detail and prompt following',
     modelDescGptImage25Sunburst: 'Default. High quality, slow',
     modelDescGptImage25Flare: 'Fast, fits most cases, can refine your prompt',
-    modelDescImage2K: 'codex2api 2K upscale alias · Images API; explicit size takes priority',
-    modelDescImage4K: 'codex2api 4K upscale alias · Images API; explicit size takes priority',
+    modelDescImage2K: '2K images, ideal for everyday use',
+    modelDescImage4K: '4K images, ideal for large displays',
     falModelFromProfile: 'The fal.ai model comes from the provider config',
     createdAt: 'Created {time}',
     elapsed: 'Elapsed {duration}',
@@ -373,7 +373,7 @@ const translations = {
     apiConfig: 'API 配置',
     queryApiKeyHint: '支持通过查询参数覆盖：',
     rememberApiKey: '记住 API Key',
-    rememberApiKeyHint: '默认不记住；开启后会保存到当前浏览器本地，方便刷新后继续使用。',
+    rememberApiKeyHint: '默认开启，密钥保存在当前浏览器本地，刷新后保留；清除站点数据后需重新填写。可关闭此选项停止保存。',
     requestTimeoutSeconds: '请求超时时间（秒）',
     requestTimeoutHint: '超过该时间会中止画图请求；new-api 中转最大支持 {seconds} 秒。',
     dataManagement: '数据管理',
@@ -447,8 +447,8 @@ const translations = {
     modelDescGptImage25: '新一代模型，细节与提示词跟随更好',
     modelDescGptImage25Sunburst: '默认模型。高质量，慢',
     modelDescGptImage25Flare: '快速，满足大部分场景，可优化提示词',
-    modelDescImage2K: 'codex2api 2K 超分别名 · Images API，指定尺寸优先',
-    modelDescImage4K: 'codex2api 4K 超分别名 · Images API，指定尺寸优先',
+    modelDescImage2K: '2K 分辨率，适合日常创作',
+    modelDescImage4K: '4K 分辨率，适合大图展示',
     falModelFromProfile: 'fal.ai 模型来自 Provider 配置',
     createdAt: '创建于 {time}',
     elapsed: '耗时 {duration}',
@@ -615,10 +615,10 @@ const translations = {
 
 export type TranslationKey = keyof typeof translations.en
 
-let activeLanguage: Language = 'en'
+let activeLanguage: Language = 'zh'
 
 export function getLanguage(settingsLanguage?: Language): Language {
-  return settingsLanguage === 'zh' ? 'zh' : 'en'
+  return settingsLanguage === 'en' ? 'en' : 'zh'
 }
 
 export function setActiveLanguage(language: Language) {

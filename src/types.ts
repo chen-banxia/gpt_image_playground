@@ -57,10 +57,10 @@ export interface TaskParams {
 export const DEFAULT_PARAMS: TaskParams = {
   size: 'auto',
   size_fit: 'none', // 默认保留接口原图；本地补边与裁剪由用户手动开启。
-  quality: 'high',
+  quality: 'auto',
   transparent_output: false,
   transparent_method: 'native',
-  stream: false,
+  stream: true,
   output_format: 'png',
   output_compression: null,
   moderation: 'auto',

@@ -41,6 +41,7 @@ export default function SettingsModal() {
   }
 
   const updateApiKey = (apiKey: string, commit = false) => {
+    // 同步更新活动配置和兼容字段；输入时即持久化，避免失焦前刷新丢失密钥。
     const nextDraft: AppSettings = {
       ...draft,
       apiKey,
@@ -168,7 +169,7 @@ export default function SettingsModal() {
                 <div className="relative">
                   <input
                     value={activeProfile.apiKey}
-                    onChange={(e) => updateApiKey(e.target.value)}
+                    onChange={(e) => updateApiKey(e.target.value, true)}
                     onBlur={(e) => updateApiKey(e.target.value, true)}
                     type={showApiKey ? 'text' : 'password'}
                     placeholder="sk-..."

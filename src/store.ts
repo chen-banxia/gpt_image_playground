@@ -153,10 +153,16 @@ interface AppState {
 }
 
 export function migrateImagePreferences(persistedState: unknown, version: number) {
-  const state = (persistedState ?? {}) as Record<string, unknown>
-  if (version >= 4) return state as never
+  const state = { ...((persistedState ?? {}) as Record<string, unknown>) }
+  if (version >= 6) return persistedState as never
+  // 本次升级统一更新默认体验，仅迁移当前偏好；后续手动切换仍会持久化。
+  state.settings = { ...(state.settings as Partial<AppSettings> ?? {}), language: 'zh', rememberApiKey: true }
+  // 一次性将旧默认 high 切回 auto；历史任务与其他质量选择不变。
+  const params = { ...DEFAULT_PARAMS, ...(state.params as Partial<TaskParams> ?? {}) }
+  params.stream = true
+  if (version < 5 && params.quality === 'high') params.quality = 'auto'
+  if (version >= 4) return { ...state, params } as never
   if (version >= 2) {
-    const params = { ...DEFAULT_PARAMS, ...(state.params as Partial<TaskParams> ?? {}) }
     // 恢复网关原图输出；只重置当前输入偏好，不改历史任务。
     params.size_fit = 'none'
     return { ...state, params } as never
@@ -164,8 +170,6 @@ export function migrateImagePreferences(persistedState: unknown, version: number
   const settings = version < 1 ? migrateLegacyDefaultImagesModel(state.settings) : normalizeSettings(state.settings)
   const profiles = settings.profiles.map((profile) => profile.provider === 'openai' && profile.model === 'gpt-image-2.5-flare'
     ? { ...profile, model: 'gpt-image-2.5-sunburst' } : profile)
-  const params = { ...DEFAULT_PARAMS, ...(state.params as Partial<TaskParams> ?? {}) }
-  if (params.quality === 'auto') params.quality = 'high'
   params.size_fit = 'none'
   return { ...state, params, settings: normalizeSettings({ ...settings, profiles }) } as never
 }
@@ -340,7 +344,7 @@ export const useStore = create<AppState>()(
     }),
     {
       name: 'gpt-image-playground',
-      version: 4,
+      version: 6,
       migrate: migrateImagePreferences,
       partialize: (state) => {
         const shouldRememberApiKey = state.settings.rememberApiKey

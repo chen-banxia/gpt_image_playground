@@ -31,7 +31,7 @@ function readTimeout(value: unknown, fallback: number): number {
 }
 
 function readLanguage(value: unknown): Language {
-  return value === 'zh' ? 'zh' : 'en'
+  return value === 'en' ? 'en' : 'zh'
 }
 
 export function createDefaultOpenAIProfile(overrides: Partial<ApiProfile> = {}): ApiProfile {
@@ -137,7 +137,7 @@ export function normalizeSettings(input: Partial<AppSettings> | unknown): AppSet
     language: readLanguage(record.language),
     baseUrl: active.baseUrl,
     apiKey: active.apiKey,
-    rememberApiKey: typeof record.rememberApiKey === 'boolean' ? record.rememberApiKey : false,
+    rememberApiKey: typeof record.rememberApiKey === 'boolean' ? record.rememberApiKey : true,
     model: active.model,
     imageGenerationModel: active.imageGenerationModel,
     timeout: active.timeout,
@@ -279,7 +279,7 @@ export function mergeImportedSettings(currentSettings: Partial<AppSettings> | un
 
 export const DEFAULT_SETTINGS: AppSettings = normalizeSettings({
   baseUrl: DEFAULT_BASE_URL,
-  language: 'en',
+  language: 'zh',
   apiKey: '',
   model: DEFAULT_IMAGES_MODEL,
   timeout: DEFAULT_API_TIMEOUT,

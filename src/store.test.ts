@@ -41,6 +41,16 @@ describe('filled output copy', () => {
 })
 
 describe('image upgrade preferences', () => {
+  it('enables Chinese, streaming and local key storage once while retaining credentials', () => {
+    const before = {
+      settings: { ...DEFAULT_SETTINGS, language: 'en', rememberApiKey: false, apiKey: 'local-test-key' },
+      params: { ...DEFAULT_PARAMS, stream: false, quality: 'medium' },
+    }
+    const after = migrateImagePreferences(before, 5) as typeof before
+    expect(after.settings).toMatchObject({ language: 'zh', rememberApiKey: true, apiKey: 'local-test-key' })
+    expect(after.params).toMatchObject({ stream: true, quality: 'medium' })
+    expect(migrateImagePreferences(before, 6)).toBe(before)
+  })
   it.each([2, 3])('restores original output for stored version %s without changing model, quality or history', (version) => {
     const before = {
       settings: { model: 'gpt-image-2.5-flare' },
@@ -49,19 +59,27 @@ describe('image upgrade preferences', () => {
     }
     const after = migrateImagePreferences(before, version) as typeof before
     expect(after.params).toMatchObject({ size: '3840x1648', size_fit: 'none', quality: 'low' })
-    expect(after.settings).toEqual(before.settings)
+    expect(after.settings).toMatchObject({ ...before.settings, language: 'zh', rememberApiKey: true })
     expect(after.tasks).toBe(before.tasks)
-    expect(migrateImagePreferences(before, 4)).toBe(before)
+    expect(migrateImagePreferences(before, 6)).toBe(before)
   })
-  it('migrates the previous default to sunburst/high while preserving size and input', async () => {
+  it('migrates the previous model default while preserving auto quality, size and input', async () => {
     const result = migrateImagePreferences({
       settings: { model: 'gpt-image-2.5-flare', apiKey: 'saved-key' },
       params: { ...DEFAULT_PARAMS, quality: 'auto', size: '2048x2048' }, prompt: 'keep me',
     }, 1) as { settings: typeof DEFAULT_SETTINGS; params: typeof DEFAULT_PARAMS; prompt: string }
     expect(result.settings.model).toBe('gpt-image-2.5-sunburst')
     expect(result.settings.apiKey).toBe('saved-key')
-    expect(result.params).toMatchObject({ quality: 'high', size: '2048x2048' })
+    expect(result.params).toMatchObject({ quality: 'auto', size: '2048x2048' })
     expect(result.prompt).toBe('keep me')
+  })
+
+  it('migrates the old high default once without changing size handling or historical quality', () => {
+    const before = { params: { ...DEFAULT_PARAMS, quality: 'high', size_fit: 'cover' }, tasks: [task({ params: { ...DEFAULT_PARAMS, quality: 'high' } })] }
+    const result = migrateImagePreferences(before, 4) as typeof before
+    expect(result.params).toMatchObject({ quality: 'auto', size_fit: 'cover' })
+    expect(result.tasks).toBe(before.tasks)
+    expect(migrateImagePreferences(before, 6)).toBe(before)
   })
 
   it('tracks previews only for running tasks and clears them without writing final outputs', () => {
@@ -162,13 +180,13 @@ describe('expired OpenAI running tasks', () => {
     expect(result.expiredTasks.map((item) => item.id)).toEqual(['legacy-running', 'openai-running'])
     expect(result.tasks.find((item) => item.id === 'legacy-running')).toMatchObject({
       status: 'error',
-      error: expect.stringContaining('Request timed out'),
+      error: expect.stringContaining('请求超时'),
       finishedAt: now,
       elapsed: 699_000,
     })
     expect(result.tasks.find((item) => item.id === 'openai-running')).toMatchObject({
       status: 'error',
-      error: expect.stringContaining('Request timed out'),
+      error: expect.stringContaining('请求超时'),
       finishedAt: now,
       elapsed: 698_000,
     })
