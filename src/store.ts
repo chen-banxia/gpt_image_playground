@@ -116,6 +116,8 @@ interface AppState {
   setTasks: (t: TaskRecord[]) => void
 
   // 搜索和筛选
+  galleryPage: number
+  setGalleryPage: (page: number) => void
   searchQuery: string
   setSearchQuery: (q: string) => void
   filterStatus: 'all' | 'running' | 'done' | 'error'
@@ -306,16 +308,19 @@ export const useStore = create<AppState>()(
       setTasks: (tasks) => set({ tasks }),
 
       // Search & Filter
+      galleryPage: 1,
+      // 翻页仅改变视图，清除旧页选择，不触碰执行中的任务与请求。
+      setGalleryPage: (page) => set({ galleryPage: Number.isFinite(page) ? Math.max(1, Math.floor(page)) : 1, selectedTaskIds: [] }),
       groups: [],
       groupFilter: 'all',
       // 只变更视图，绝不取消请求或重置生成状态。
-      setGroupFilter: (groupFilter) => set({ groupFilter, selectedTaskIds: [] }),
+      setGroupFilter: (groupFilter) => set({ groupFilter, galleryPage: 1, selectedTaskIds: [] }),
       searchQuery: '',
-      setSearchQuery: (searchQuery) => set({ searchQuery }),
+      setSearchQuery: (searchQuery) => set({ searchQuery, galleryPage: 1, selectedTaskIds: [] }),
       filterStatus: 'all',
-      setFilterStatus: (filterStatus) => set({ filterStatus }),
+      setFilterStatus: (filterStatus) => set({ filterStatus, galleryPage: 1, selectedTaskIds: [] }),
       filterFavorite: false,
-      setFilterFavorite: (filterFavorite) => set({ filterFavorite }),
+      setFilterFavorite: (filterFavorite) => set({ filterFavorite, galleryPage: 1, selectedTaskIds: [] }),
 
       // Selection
       downloadedImages: {},
