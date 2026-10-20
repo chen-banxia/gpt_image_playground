@@ -1,4 +1,4 @@
-import { useRef, useEffect, useCallback, useState, useMemo, type ReactNode } from 'react'
+import { useRef, useEffect, useCallback, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { useStore, submitTask, addImageFromFile, updateTaskInStore, removeMultipleTasks, ensureImageCached } from '../store'
 import { buildSelectedImagesZip, saveImagesZip } from '../lib/batchDownload'
@@ -12,7 +12,7 @@ import { useT } from '../hooks/useI18n'
 import Select from './Select'
 import SizePickerModal from './SizePickerModal'
 import GroupPicker from './GroupPicker'
-import { filterGalleryTasks } from '../lib/taskGroups'
+import { useGalleryPage } from '../hooks/useGalleryPage'
 import ViewportTooltip from './ViewportTooltip'
 
 /** 通用悬浮气泡提示 */
@@ -58,19 +58,12 @@ export default function InputBar() {
   const [downloading, setDownloading] = useState(false)
   const setSelectedTaskIds = useStore((s) => s.setSelectedTaskIds)
   const clearSelection = useStore((s) => s.clearSelection)
-  const tasks = useStore((s) => s.tasks)
-  const filterStatus = useStore((s) => s.filterStatus)
-  const filterFavorite = useStore((s) => s.filterFavorite)
-  const searchQuery = useStore((s) => s.searchQuery)
-  const groups = useStore((s) => s.groups)
-  const groupFilter = useStore((s) => s.groupFilter)
 
-  const filteredTasks = useMemo(() => {
-    return filterGalleryTasks(tasks, groups, groupFilter, searchQuery, filterStatus, filterFavorite)
-  }, [tasks, groups, groupFilter, searchQuery, filterStatus, filterFavorite])
+  const { items: filteredTasks } = useGalleryPage()
 
   const allVisibleSelected = filteredTasks.length > 0 && filteredTasks.every((task) => selectedTaskIds.includes(task.id))
-  const selectedTasks = tasks.filter((task) => selectedTaskIds.includes(task.id))
+  // 即使选择清理的 effect 尚未执行，也只允许操作当前页仍可见的记录。
+  const selectedTasks = filteredTasks.filter((task) => selectedTaskIds.includes(task.id))
   const imageCount = selectedTasks.reduce((count, task) => count + task.outputImages.length, 0)
 
   const handleDownloadSelected = async () => {
@@ -96,35 +89,34 @@ export default function InputBar() {
   }, [allVisibleSelected, selectedTaskIds, filteredTasks, setSelectedTaskIds])
 
   const handleToggleFavorite = useCallback(() => {
-    const selectedTasks = tasks.filter((t) => selectedTaskIds.includes(t.id))
     const allFavorite = selectedTasks.length > 0 && selectedTasks.every((t) => t.isFavorite)
     const newFavoriteState = !allFavorite
     setConfirmDialog({
       title: newFavoriteState ? t('batchFavorite') : t('batchUnfavorite'),
       message: newFavoriteState
-        ? t('batchFavoriteMessage', { count: selectedTaskIds.length })
-        : t('batchUnfavoriteMessage', { count: selectedTaskIds.length }),
+        ? t('batchFavoriteMessage', { count: selectedTasks.length })
+        : t('batchUnfavoriteMessage', { count: selectedTasks.length }),
       confirmText: newFavoriteState ? t('confirmFavorite') : t('confirmUnfavorite'),
       action: () => {
-        selectedTaskIds.forEach((id) => {
-          updateTaskInStore(id, { isFavorite: newFavoriteState })
+        selectedTasks.forEach((task) => {
+          updateTaskInStore(task.id, { isFavorite: newFavoriteState })
         })
         clearSelection()
       },
     })
-  }, [tasks, selectedTaskIds, clearSelection, setConfirmDialog, t])
+  }, [selectedTasks, clearSelection, setConfirmDialog, t])
 
   const handleDeleteSelected = useCallback(() => {
-    if (!selectedTaskIds.length) return
+    if (!selectedTasks.length) return
     setConfirmDialog({
       title: t('batchDelete'),
-      message: t('batchDeleteMessage', { count: selectedTaskIds.length }),
+      message: t('batchDeleteMessage', { count: selectedTasks.length }),
       action: async () => {
-        try { await removeMultipleTasks(selectedTaskIds) }
+        try { await removeMultipleTasks(selectedTasks.map((task) => task.id)) }
         catch (error) { showToast(error instanceof Error ? error.message : String(error), 'error') }
       },
     })
-  }, [selectedTaskIds, setConfirmDialog, t])
+  }, [selectedTasks, setConfirmDialog, showToast, t])
   const maskDraft = useStore((s) => s.maskDraft)
   const clearMaskDraft = useStore((s) => s.clearMaskDraft)
   const setMaskEditorImageId = useStore((s) => s.setMaskEditorImageId)
@@ -1206,9 +1198,9 @@ export default function InputBar() {
           <div data-no-drag-select className="mb-3 flex justify-center">
             <div className="flex max-w-full flex-wrap items-center justify-center gap-1 rounded-2xl border border-white/10 bg-gray-800/95 p-2 text-xs text-white shadow-lg backdrop-blur" role="toolbar" aria-label={t('batchActions')}>
               <span className="px-2" aria-live="polite">{t('batchSelected', { count: selectedTasks.length, images: imageCount })}</span>
-              <GroupPicker taskIds={selectedTaskIds} batch />
+              <GroupPicker taskIds={selectedTasks.map((task) => task.id)} batch />
               <button type="button" onClick={handleSelectAllToggle} className="rounded-lg px-2 py-2 text-blue-300 hover:bg-white/10">
-                {t(allVisibleSelected ? 'cancelSelectAll' : 'selectAllVisible')}
+                {t(allVisibleSelected ? 'cancelSelectAll' : 'selectCurrentPage')}
               </button>
               <button type="button" onClick={handleDownloadSelected} disabled={downloading || imageCount === 0}
                 className="rounded-lg px-2 py-2 text-green-300 hover:bg-white/10 disabled:opacity-40">

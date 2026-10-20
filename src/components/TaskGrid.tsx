@@ -1,8 +1,9 @@
-import { useMemo, useRef, useState, useEffect } from 'react'
+import { useRef, useState, useEffect } from 'react'
 import { useStore, reuseConfig, editOutputs, removeTask } from '../store'
 import { useT } from '../hooks/useI18n'
 import TaskCard from './TaskCard'
-import { filterGalleryTasks } from '../lib/taskGroups'
+import { useGalleryPage } from '../hooks/useGalleryPage'
+import GalleryPagination from './GalleryPagination'
 
 export default function TaskGrid() {
   const t = useT()
@@ -10,7 +11,6 @@ export default function TaskGrid() {
   const searchQuery = useStore((s) => s.searchQuery)
   const filterStatus = useStore((s) => s.filterStatus)
   const filterFavorite = useStore((s) => s.filterFavorite)
-  const groups = useStore((s) => s.groups)
   const groupFilter = useStore((s) => s.groupFilter)
   const setDetailTaskId = useStore((s) => s.setDetailTaskId)
   const setConfirmDialog = useStore((s) => s.setConfirmDialog)
@@ -30,9 +30,19 @@ export default function TaskGrid() {
   const initialSelection = useRef<string[]>([])
   const isMac = /Mac|iPod|iPhone|iPad/.test(navigator.platform)
 
-  const filteredTasks = useMemo(() => {
-    return filterGalleryTasks(tasks, groups, groupFilter, searchQuery, filterStatus, filterFavorite)
-  }, [tasks, groups, groupFilter, searchQuery, filterStatus, filterFavorite])
+  const pagination = useGalleryPage()
+  const filteredTasks = pagination.items
+  const galleryPage = useStore((s) => s.galleryPage)
+  const setGalleryPage = useStore((s) => s.setGalleryPage)
+  useEffect(() => {
+    if (galleryPage !== pagination.page) setGalleryPage(pagination.page)
+  }, [galleryPage, pagination.page, setGalleryPage])
+  useEffect(() => {
+    // 删除、移动或任务状态变化可能让选中记录离开当前页，及时清除隐藏选择。
+    const visible = new Set(filteredTasks.map((task) => task.id))
+    const selected = useStore.getState().selectedTaskIds
+    if (selected.some((id) => !visible.has(id))) setSelectedTaskIds(selected.filter((id) => visible.has(id)))
+  }, [filteredTasks, setSelectedTaskIds])
 
   const handleDelete = (task: typeof tasks[0]) => {
     setConfirmDialog({
@@ -162,7 +172,7 @@ export default function TaskGrid() {
   if (!filteredTasks.length) {
     return (
       <div className="text-center py-20 text-gray-400 dark:text-gray-500">
-        {searchQuery || filterFavorite || groupFilter !== 'all' ? (
+        {searchQuery || filterFavorite || groupFilter !== 'all' || filterStatus !== 'all' ? (
           <p className="text-sm">{t('noMatches')}</p>
         ) : (
           <>
@@ -192,6 +202,7 @@ export default function TaskGrid() {
       data-task-grid-root
       className="relative min-h-[50vh]"
     >
+      <GalleryPagination {...pagination} />
       <div ref={gridRef} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pb-10">
         {filteredTasks.map((task) => (
           <div key={task.id} className="task-card-wrapper relative" data-task-id={task.id}>

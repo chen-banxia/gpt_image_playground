@@ -2,6 +2,14 @@ import type { Language } from './types'
 
 const translations = {
   en: {
+    galleryPagination: 'Gallery pages',
+    galleryRange: '{start}–{end} of {total} records · 9 per page',
+    galleryPage: '{page} / {total}',
+    previousPage: 'Previous',
+    nextPage: 'Next',
+    jumpToPage: 'Go to page',
+    jumpPage: 'Go',
+    selectCurrentPage: 'Select this page',
     imageGroup: 'Group',
     filterGroup: 'Filter by group',
     allGroups: 'All groups',
@@ -336,6 +344,14 @@ const translations = {
     clipboardEmbeddedDenied: 'Copy failed: clipboard permission is not granted in the embedded page',
   },
   zh: {
+    galleryPagination: '画廊分页',
+    galleryRange: '第 {start}–{end} 条，共 {total} 条 · 每页 9 条',
+    galleryPage: '第 {page} / {total} 页',
+    previousPage: '上一页',
+    nextPage: '下一页',
+    jumpToPage: '跳至页码',
+    jumpPage: '跳转',
+    selectCurrentPage: '全选本页',
     imageGroup: '分组',
     filterGroup: '按分组筛选',
     allGroups: '全部分组',
