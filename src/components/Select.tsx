@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useLayoutEffect, useCallback, type CSSProperties } from 'react'
+import { createPortal } from 'react-dom'
 
 interface Option {
   label: string
@@ -16,25 +17,68 @@ interface SelectProps {
   /** 下拉面板的宽度等样式，默认与触发器同宽 */
   menuClassName?: string
   title?: string
+  /** 将菜单挂载到页面根部，避免被侧栏等滚动容器裁切。 */
+  portal?: boolean
 }
 
-export default function Select({ value, onChange, options, disabled, className, menuClassName, title }: SelectProps) {
+export default function Select({ value, onChange, options, disabled, className, menuClassName, title, portal = false }: SelectProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [openUp, setOpenUp] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLDivElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
+  const [menuStyle, setMenuStyle] = useState<CSSProperties>({})
 
   const selectedOption = options.find((o) => o.value === value)
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+      // 浮层菜单不在触发器的 DOM 子树内，点击菜单选项时仍需视为内部点击。
+      if (containerRef.current && !containerRef.current.contains(e.target as Node) && !menuRef.current?.contains(e.target as Node)) {
         setIsOpen(false)
       }
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
+
+  useLayoutEffect(() => {
+    if (!isOpen || !portal) return
+    const updatePosition = () => {
+      const trigger = triggerRef.current
+      if (!trigger?.getClientRects().length) {
+        setIsOpen(false)
+        return
+      }
+      const rect = trigger.getBoundingClientRect()
+      // 按视口剩余空间选择展开方向，短窗口下限制菜单高度并允许内部滚动。
+      const spaceAbove = rect.top - 14
+      const spaceBelow = window.innerHeight - rect.bottom - 14
+      const above = spaceAbove > spaceBelow
+      setOpenUp(above)
+      setMenuStyle({
+        left: rect.left,
+        width: rect.width,
+        top: above ? undefined : rect.bottom + 6,
+        bottom: above ? window.innerHeight - rect.top + 6 : undefined,
+        maxHeight: Math.max(0, Math.min(240, above ? spaceAbove : spaceBelow)),
+      })
+    }
+    updatePosition()
+    const observer = new ResizeObserver(updatePosition)
+    if (triggerRef.current) observer.observe(triggerRef.current)
+    const handleScroll = (event: Event) => {
+      // 外层滚动后关闭菜单，避免浮层脱离触发器；菜单自身滚动不关闭。
+      if (!menuRef.current?.contains(event.target as Node)) setIsOpen(false)
+    }
+    window.addEventListener('resize', updatePosition)
+    window.addEventListener('scroll', handleScroll, true)
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('resize', updatePosition)
+      window.removeEventListener('scroll', handleScroll, true)
+    }
+  }, [isOpen, portal])
 
   const handleToggle = useCallback((e: React.MouseEvent) => {
     if (disabled) return
@@ -50,6 +94,38 @@ export default function Select({ value, onChange, options, disabled, className, 
 
     setIsOpen(!isOpen)
   }, [disabled, isOpen, options.length])
+
+  const renderMenu = () => (
+    <div
+      ref={menuRef}
+      style={portal ? menuStyle : undefined}
+      className={`${portal ? 'fixed' : 'absolute'} z-50 bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl border border-gray-200/60 dark:border-white/[0.08] rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.3)] overflow-hidden py-1 max-h-60 overflow-y-auto ring-1 ring-black/5 dark:ring-white/10 ${
+        menuClassName ?? 'w-full'
+      } ${portal ? (openUp ? 'animate-dropdown-up' : 'animate-dropdown-down') : (openUp ? 'bottom-full mb-1.5 animate-dropdown-up' : 'top-full mt-1.5 animate-dropdown-down')}`}
+    >
+      {options.map((option) => (
+        <div
+          key={option.value}
+          onClick={() => {
+            onChange(option.value)
+            setIsOpen(false)
+          }}
+          className={`px-3 py-2 text-xs cursor-pointer transition-colors ${
+            option.value === value
+              ? 'bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 font-medium'
+              : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/[0.06]'
+          }`}
+        >
+          <div className="truncate">{option.label}</div>
+          {option.description && (
+            <div className={`mt-0.5 text-[10px] font-normal leading-snug ${option.value === value ? 'text-blue-500/80 dark:text-blue-400/70' : 'text-gray-400 dark:text-gray-500'}`}>
+              {option.description}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  )
 
   return (
     <div ref={containerRef} className="relative w-full">
@@ -72,41 +148,7 @@ export default function Select({ value, onChange, options, disabled, className, 
         </svg>
       </div>
 
-      {isOpen && (
-        <div
-          className={`absolute z-50 bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl border border-gray-200/60 dark:border-white/[0.08] rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.3)] overflow-hidden py-1 max-h-60 overflow-y-auto ring-1 ring-black/5 dark:ring-white/10 ${
-            menuClassName ?? 'w-full'
-          } ${openUp ? 'bottom-full mb-1.5 animate-dropdown-up' : 'top-full mt-1.5 animate-dropdown-down'}`}
-        >
-          {options.map((option) => (
-            <div
-              key={option.value}
-              onClick={() => {
-                onChange(option.value)
-                setIsOpen(false)
-              }}
-              className={`px-3 py-2 text-xs cursor-pointer transition-colors ${
-                option.value === value
-                  ? 'bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 font-medium'
-                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/[0.06]'
-              }`}
-            >
-              <div className="truncate">{option.label}</div>
-              {option.description && (
-                <div
-                  className={`mt-0.5 text-[10px] font-normal leading-snug ${
-                    option.value === value
-                      ? 'text-blue-500/80 dark:text-blue-400/70'
-                      : 'text-gray-400 dark:text-gray-500'
-                  }`}
-                >
-                  {option.description}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
+      {isOpen && (portal ? createPortal(renderMenu(), document.body) : renderMenu())}
     </div>
   )
 }
