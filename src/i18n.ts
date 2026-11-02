@@ -2,6 +2,9 @@ import type { Language } from './types'
 
 const translations = {
   en: {
+    generationPanel: 'Image creation',
+    collapseGenerationPanel: 'Collapse panel',
+    expandGenerationPanel: 'Expand panel',
     galleryPagination: 'Gallery pages',
     galleryRange: '{start}–{end} of {total} records · 9 per page',
     galleryPage: '{page} / {total}',
@@ -344,6 +347,9 @@ const translations = {
     clipboardEmbeddedDenied: 'Copy failed: clipboard permission is not granted in the embedded page',
   },
   zh: {
+    generationPanel: '画图设置',
+    collapseGenerationPanel: '收起面板',
+    expandGenerationPanel: '展开面板',
     galleryPagination: '画廊分页',
     galleryRange: '第 {start}–{end} 条，共 {total} 条 · 每页 9 条',
     galleryPage: '第 {page} / {total} 页',

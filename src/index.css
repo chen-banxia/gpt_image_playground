@@ -216,6 +216,50 @@ input[type="number"] {
   min-height: 3.5rem;
 }
 
+.generation-layout {
+  /* 侧栏与画廊共用占位宽度，展开和收起时不会覆盖右侧内容。 */
+  --input-panel-width: 340px;
+}
+
+.generation-sidebar {
+  /* 窄屏使用普通文档流，将可折叠面板放在图片列表上方。 */
+  margin: 1rem max(1rem, var(--safe-area-right)) 0 max(1rem, var(--safe-area-left));
+}
+
+.generation-panel-body {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 1rem 1rem;
+}
+
+@media (min-width: 768px) {
+  .generation-layout[data-input-collapsed='true'] {
+    --input-panel-width: 56px;
+  }
+
+  .generation-sidebar {
+    position: fixed;
+    /* 对齐第一排图片；短窗口限制下移距离，尽量为面板保留 240px 操作空间。 */
+    top: min(var(--input-panel-top, calc(3.5rem + var(--safe-area-top) + 1px + 1rem)), max(calc(3.5rem + var(--safe-area-top) + 1px + 1rem), calc(100dvh - 240px)));
+    bottom: max(1rem, var(--safe-area-bottom));
+    left: max(1rem, var(--safe-area-left));
+    z-index: 30;
+    width: var(--input-panel-width);
+    margin: 0;
+  }
+
+  .generation-panel {
+    display: flex;
+    flex-direction: column;
+    max-height: 100%;
+  }
+
+  .generation-gallery {
+    margin-left: calc(var(--input-panel-width) + max(1rem, var(--safe-area-left)) + 0.5rem);
+  }
+}
+
 @media (max-width: 640px) {
   input,
   textarea,

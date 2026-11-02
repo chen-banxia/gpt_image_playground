@@ -203,7 +203,8 @@ export default function TaskGrid() {
       className="relative min-h-[50vh]"
     >
       <GalleryPagination {...pagination} />
-      <div ref={gridRef} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pb-10">
+      {/* 按可用宽度自动调整列数，侧栏展开后仍保持卡片可读；标记用于侧栏顶部对齐。 */}
+      <div ref={gridRef} data-gallery-items className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,320px),1fr))] gap-4 pb-10">
         {filteredTasks.map((task) => (
           <div key={task.id} className="task-card-wrapper relative" data-task-id={task.id}>
             {batchMode && (

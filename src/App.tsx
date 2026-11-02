@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { initStore } from './store'
 import { useStore } from './store'
 import { normalizeBaseUrl } from './lib/api'
@@ -10,6 +10,7 @@ import Header from './components/Header'
 import SearchBar from './components/SearchBar'
 import TaskGrid from './components/TaskGrid'
 import InputBar from './components/InputBar'
+import BatchActions from './components/BatchActions'
 import DetailModal from './components/DetailModal'
 import Lightbox from './components/Lightbox'
 import SettingsModal from './components/SettingsModal'
@@ -19,9 +20,39 @@ import MaskEditorModal from './components/MaskEditorModal'
 import ImageContextMenu from './components/ImageContextMenu'
 
 export default function App() {
+  // 每次进入首页默认展开；收起状态只控制布局，不清空已填写的生成参数。
+  const [inputCollapsed, setInputCollapsed] = useState(false)
+  const layoutRef = useRef<HTMLDivElement>(null)
+  const galleryRef = useRef<HTMLDivElement>(null)
   const setSettings = useStore((s) => s.setSettings)
   const language = useStore((s) => s.settings.language)
   useDockerApiUrlMigrationNotice()
+
+  useLayoutEffect(() => {
+    const layout = layoutRef.current
+    const gallery = galleryRef.current
+    if (!layout || !gallery) return
+
+    const alignInputPanel = () => {
+      const items = gallery.querySelector<HTMLElement>('[data-gallery-items]')
+      if (!window.matchMedia('(min-width: 768px)').matches || !items) {
+        layout.style.removeProperty('--input-panel-top')
+        return
+      }
+      // 使用文档坐标对齐第一排图片，避免页面滚动时固定面板跟着上移。
+      layout.style.setProperty('--input-panel-top', `${items.getBoundingClientRect().top + window.scrollY}px`)
+    }
+
+    alignInputPanel()
+    // 筛选栏换行、批量操作栏出现或面板收起时，重新计算图片区域的起点。
+    const observer = new ResizeObserver(alignInputPanel)
+    observer.observe(gallery)
+    window.addEventListener('resize', alignInputPanel)
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('resize', alignInputPanel)
+    }
+  }, [])
 
   useEffect(() => {
     setActiveLanguage(language)
@@ -111,13 +142,16 @@ export default function App() {
   return (
     <>
       <Header />
-      <main data-home-main data-drag-select-surface className="pb-48">
-        <div className="safe-area-x max-w-7xl mx-auto">
-          <SearchBar />
-          <TaskGrid />
-        </div>
-      </main>
-      <InputBar />
+      <div ref={layoutRef} className="generation-layout" data-input-collapsed={inputCollapsed}>
+        <InputBar collapsed={inputCollapsed} onToggle={() => setInputCollapsed((value) => !value)} />
+        <main data-home-main data-drag-select-surface className="generation-gallery min-w-0 pb-6">
+          <div ref={galleryRef} className="safe-area-x max-w-7xl mx-auto">
+            <SearchBar />
+            <BatchActions />
+            <TaskGrid />
+          </div>
+        </main>
+      </div>
       <DetailModal />
       <Lightbox />
       <SettingsModal />

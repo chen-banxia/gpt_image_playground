@@ -1,7 +1,6 @@
-import { useRef, useEffect, useCallback, useState, type ReactNode } from 'react'
+import { useRef, useEffect, useLayoutEffect, useCallback, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { useStore, submitTask, addImageFromFile, updateTaskInStore, removeMultipleTasks, ensureImageCached } from '../store'
-import { buildSelectedImagesZip, saveImagesZip } from '../lib/batchDownload'
+import { useStore, submitTask, addImageFromFile } from '../store'
 import { DEFAULT_PARAMS } from '../types'
 import { getActiveApiProfile } from '../lib/apiProfiles'
 import { IMAGE_MODEL_OPTIONS, isKnownImageModel, isGptImage25Model } from '../lib/imageModels'
@@ -11,16 +10,57 @@ import { createMaskPreviewDataUrl } from '../lib/canvasImage'
 import { useT } from '../hooks/useI18n'
 import Select from './Select'
 import SizePickerModal from './SizePickerModal'
-import GroupPicker from './GroupPicker'
-import { useGalleryPage } from '../hooks/useGalleryPage'
-import ViewportTooltip from './ViewportTooltip'
 
-/** 通用悬浮气泡提示 */
+/** 气泡挂载到页面根部，避免被侧栏的独立滚动区域裁切。 */
 function ButtonTooltip({ visible, text }: { visible: boolean; text: ReactNode }) {
+  const anchorRef = useRef<HTMLSpanElement>(null)
+  const tooltipRef = useRef<HTMLDivElement>(null)
+  const [position, setPosition] = useState<{ left: number; top: number } | null>(null)
+
+  useLayoutEffect(() => {
+    if (!visible) {
+      setPosition(null)
+      return
+    }
+    const updatePosition = () => {
+      const anchor = anchorRef.current
+      const tooltip = tooltipRef.current
+      if (!anchor?.getClientRects().length || !tooltip) {
+        setPosition(null)
+        return
+      }
+      const rect = anchor.getBoundingClientRect()
+      const { width, height } = tooltip.getBoundingClientRect()
+      // 优先显示在控件上方，并为视口左右边缘预留间距。
+      setPosition({
+        left: Math.max(8, Math.min(rect.left + (rect.width - width) / 2, window.innerWidth - width - 8)),
+        top: rect.top - height - 8 >= 8 ? rect.top - height - 8 : rect.bottom + 8,
+      })
+    }
+    updatePosition()
+    const observer = new ResizeObserver(updatePosition)
+    if (anchorRef.current) observer.observe(anchorRef.current)
+    window.addEventListener('resize', updatePosition)
+    window.addEventListener('scroll', updatePosition, true)
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('resize', updatePosition)
+      window.removeEventListener('scroll', updatePosition, true)
+    }
+  }, [visible, text])
+
   return (
-    <ViewportTooltip visible={visible} className="z-10 whitespace-nowrap">
-      {text}
-    </ViewportTooltip>
+    <>
+      <span ref={anchorRef} aria-hidden="true" className="pointer-events-none absolute inset-0" />
+      {visible && createPortal(
+        <div ref={tooltipRef} role="tooltip"
+          className="pointer-events-none fixed z-50 w-max max-w-[min(280px,calc(100vw-16px))] rounded-lg bg-gray-800 px-3 py-2 text-xs font-normal text-white shadow-lg"
+          style={{ left: position?.left ?? 0, top: position?.top ?? 0, visibility: position ? 'visible' : 'hidden' }}>
+          {text}
+        </div>,
+        document.body,
+      )}
+    </>
   )
 }
 
@@ -37,7 +77,12 @@ function useIsMobile() {
   return isMobile
 }
 
-export default function InputBar() {
+interface InputBarProps {
+  collapsed: boolean
+  onToggle: () => void
+}
+
+export default function InputBar({ collapsed, onToggle }: InputBarProps) {
   const t = useT()
   const prompt = useStore((s) => s.prompt)
   const setPrompt = useStore((s) => s.setPrompt)
@@ -52,71 +97,6 @@ export default function InputBar() {
   const setLightboxImageId = useStore((s) => s.setLightboxImageId)
   const showToast = useStore((s) => s.showToast)
   const setConfirmDialog = useStore((s) => s.setConfirmDialog)
-  const selectedTaskIds = useStore((s) => s.selectedTaskIds)
-  const batchMode = useStore((s) => s.batchMode)
-  const setBatchMode = useStore((s) => s.setBatchMode)
-  const [downloading, setDownloading] = useState(false)
-  const setSelectedTaskIds = useStore((s) => s.setSelectedTaskIds)
-  const clearSelection = useStore((s) => s.clearSelection)
-
-  const { items: filteredTasks } = useGalleryPage()
-
-  const allVisibleSelected = filteredTasks.length > 0 && filteredTasks.every((task) => selectedTaskIds.includes(task.id))
-  // 即使选择清理的 effect 尚未执行，也只允许操作当前页仍可见的记录。
-  const selectedTasks = filteredTasks.filter((task) => selectedTaskIds.includes(task.id))
-  const imageCount = selectedTasks.reduce((count, task) => count + task.outputImages.length, 0)
-
-  const handleDownloadSelected = async () => {
-    if (downloading || !imageCount) return
-    setDownloading(true)
-    try {
-      const result = await buildSelectedImagesZip(selectedTasks, ensureImageCached)
-      saveImagesZip(result.bytes)
-      useStore.getState().markImagesDownloaded(result.imageIds)
-      showToast(t('batchDownloadDone', { count: result.count, skipped: result.skipped }), 'success')
-    } catch (error) {
-      showToast(error instanceof Error ? error.message : t('downloadFailed'), 'error')
-    } finally { setDownloading(false) }
-  }
-
-  const handleSelectAllToggle = useCallback(() => {
-    if (allVisibleSelected) {
-      const visibleIds = new Set(filteredTasks.map((task) => task.id))
-      setSelectedTaskIds(selectedTaskIds.filter((id) => !visibleIds.has(id)))
-    } else {
-      setSelectedTaskIds([...new Set([...selectedTaskIds, ...filteredTasks.map((task) => task.id)])])
-    }
-  }, [allVisibleSelected, selectedTaskIds, filteredTasks, setSelectedTaskIds])
-
-  const handleToggleFavorite = useCallback(() => {
-    const allFavorite = selectedTasks.length > 0 && selectedTasks.every((t) => t.isFavorite)
-    const newFavoriteState = !allFavorite
-    setConfirmDialog({
-      title: newFavoriteState ? t('batchFavorite') : t('batchUnfavorite'),
-      message: newFavoriteState
-        ? t('batchFavoriteMessage', { count: selectedTasks.length })
-        : t('batchUnfavoriteMessage', { count: selectedTasks.length }),
-      confirmText: newFavoriteState ? t('confirmFavorite') : t('confirmUnfavorite'),
-      action: () => {
-        selectedTasks.forEach((task) => {
-          updateTaskInStore(task.id, { isFavorite: newFavoriteState })
-        })
-        clearSelection()
-      },
-    })
-  }, [selectedTasks, clearSelection, setConfirmDialog, t])
-
-  const handleDeleteSelected = useCallback(() => {
-    if (!selectedTasks.length) return
-    setConfirmDialog({
-      title: t('batchDelete'),
-      message: t('batchDeleteMessage', { count: selectedTasks.length }),
-      action: async () => {
-        try { await removeMultipleTasks(selectedTasks.map((task) => task.id)) }
-        catch (error) { showToast(error instanceof Error ? error.message : String(error), 'error') }
-      },
-    })
-  }, [selectedTasks, setConfirmDialog, showToast, t])
   const maskDraft = useStore((s) => s.maskDraft)
   const clearMaskDraft = useStore((s) => s.clearMaskDraft)
   const setMaskEditorImageId = useStore((s) => s.setMaskEditorImageId)
@@ -124,9 +104,8 @@ export default function InputBar() {
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const cardRef = useRef<HTMLDivElement>(null)
   const imagesRef = useRef<HTMLDivElement>(null)
-  const prevHeightRef = useRef(42)
+  const prevHeightRef = useRef(120)
 
   const [isDragging, setIsDragging] = useState(false)
   const [submitHover, setSubmitHover] = useState(false)
@@ -136,14 +115,11 @@ export default function InputBar() {
   const [sizeHintVisible, setSizeHintVisible] = useState(false)
   const [qualityHintVisible, setQualityHintVisible] = useState(false)
   const [imageHintId, setImageHintId] = useState<string | null>(null)
-  const [mobileCollapsed, setMobileCollapsed] = useState(false)
   const [showSizePicker, setShowSizePicker] = useState(false)
   const [maskPreviewUrl, setMaskPreviewUrl] = useState('')
   const [imageDragIndex, setImageDragIndex] = useState<number | null>(null)
   const [imageDragOverIndex, setImageDragOverIndex] = useState<number | null>(null)
   const [touchDragPreview, setTouchDragPreview] = useState<{ src: string; x: number; y: number } | null>(null)
-  const handleRef = useRef<HTMLDivElement>(null)
-  const dragTouchRef = useRef({ startY: 0, moved: false })
   const imageDragIndexRef = useRef<number | null>(null)
   const imageTouchDragRef = useRef({ index: null as number | null, startX: 0, startY: 0, moved: false })
   const imageDragOverIndexRef = useRef<number | null>(null)
@@ -577,21 +553,16 @@ export default function InputBar() {
 
   const adjustTextareaHeight = useCallback(() => {
     const el = textareaRef.current
-    if (!el) return
+    if (!el || !el.getClientRects().length) return
 
-    // 计算图片区域和其他固定元素占用的高度
-    const imagesHeight = imagesRef.current?.offsetHeight ?? 0
-    const fixedOverhead = imagesHeight + 140
-
-    // textarea 最大高度 = 页面 40% 减去固定开销，至少保留 80px
-    const maxH = Math.max(window.innerHeight * 0.4 - fixedOverhead, 80)
+    const maxH = Math.max(120, Math.min(window.innerHeight * 0.35, 320))
 
     // 1. 关闭过渡动画，设高度为 0 以获取真实的文本内容高度
     el.style.transition = 'none'
     el.style.height = '0'
     el.style.overflowY = 'hidden'
     const scrollH = el.scrollHeight
-    const minH = 42
+    const minH = 120
     const desired = Math.max(scrollH, minH)
     const targetH = desired > maxH ? maxH : desired
 
@@ -608,8 +579,8 @@ export default function InputBar() {
   }, [])
 
   useEffect(() => {
-    adjustTextareaHeight()
-  }, [prompt, adjustTextareaHeight])
+    if (!collapsed) adjustTextareaHeight()
+  }, [prompt, collapsed, adjustTextareaHeight])
 
   // 图片队列变化时也重新计算
   useEffect(() => {
@@ -620,34 +591,6 @@ export default function InputBar() {
     window.addEventListener('resize', adjustTextareaHeight)
     return () => window.removeEventListener('resize', adjustTextareaHeight)
   }, [adjustTextareaHeight])
-
-  // 移动端拖动条手势
-  useEffect(() => {
-    const el = handleRef.current
-    if (!el) return
-    const onTouchStart = (e: TouchEvent) => {
-      dragTouchRef.current = { startY: e.touches[0].clientY, moved: false }
-    }
-    const onTouchMove = (e: TouchEvent) => {
-      const dy = e.touches[0].clientY - dragTouchRef.current.startY
-      if (Math.abs(dy) > 10) dragTouchRef.current.moved = true
-      if (dy > 30) setMobileCollapsed(true)
-      if (dy < -30) setMobileCollapsed(false)
-    }
-    const onTouchEnd = () => {
-      if (!dragTouchRef.current.moved) {
-        setMobileCollapsed((v) => !v)
-      }
-    }
-    el.addEventListener('touchstart', onTouchStart, { passive: true })
-    el.addEventListener('touchmove', onTouchMove, { passive: true })
-    el.addEventListener('touchend', onTouchEnd)
-    return () => {
-      el.removeEventListener('touchstart', onTouchStart)
-      el.removeEventListener('touchmove', onTouchMove)
-      el.removeEventListener('touchend', onTouchEnd)
-    }
-  }, [])
 
   const selectClass = 'px-3 py-1.5 rounded-xl border border-gray-200/60 dark:border-white/[0.08] bg-white/50 dark:bg-white/[0.03] hover:bg-white dark:hover:bg-white/[0.06] text-xs transition-all duration-200 shadow-sm'
 
@@ -958,13 +901,13 @@ export default function InputBar() {
     <div className={`grid ${cols} gap-2 text-xs flex-1`}>
       <label className={`relative flex flex-col gap-0.5 min-w-0 ${modelCellClass}`}>
         <span className="text-gray-400 dark:text-gray-500 ml-1">{t(activeProfile.apiMode === 'responses' ? 'responseImageModel' : 'model')}</span>
-        <Select
+        <Select portal
           value={activeModel}
           onChange={(val) => setSettings(activeProfile.apiMode === 'responses' ? { imageGenerationModel: val as string } : { model: val as string })}
           options={modelOptions}
           disabled={modelSelectDisabled}
           title={modelSelectDisabled ? t('falModelFromProfile') : t('chooseModel')}
-          menuClassName="w-[240px] max-w-[calc(100vw_-_2.5rem)]"
+          menuClassName="w-full"
           className={modelSelectDisabled
             ? 'px-3 py-1.5 rounded-xl border border-gray-200/60 dark:border-white/[0.08] bg-gray-100/50 dark:bg-white/[0.05] opacity-50 cursor-not-allowed text-[11px] transition-all duration-200 shadow-sm'
             : `${selectClass} !text-[11px]`}
@@ -1008,7 +951,7 @@ export default function InputBar() {
         onClick={showQualityHint}
       >
         <span className="text-gray-400 dark:text-gray-500 ml-1">{t('quality')}</span>
-        <Select
+        <Select portal
           value={isFalProvider && params.quality === 'auto' ? 'high' : params.quality}
           onChange={(val) => setParams({ quality: val as any })}
           options={qualityOptions}
@@ -1021,7 +964,7 @@ export default function InputBar() {
       </label>
       <label className="flex flex-col gap-0.5 min-w-0">
         <span className="text-gray-400 dark:text-gray-500 ml-1">{t('format')}</span>
-        <Select
+        <Select portal
           value={params.output_format}
           onChange={(val) => setParams({ output_format: val as typeof params.output_format, ...(val === 'jpeg' ? { transparent_output: false } : {}) })}
           options={[
@@ -1072,7 +1015,7 @@ export default function InputBar() {
         onClick={showModerationHint}
       >
         <span className="text-gray-400 dark:text-gray-500 ml-1">{t('moderation')}</span>
-        <Select
+        <Select portal
           value={moderationDisabled ? 'auto' : params.moderation}
           onChange={(val) => {
             if (!moderationDisabled) setParams({ moderation: val as any })
@@ -1093,7 +1036,7 @@ export default function InputBar() {
       </label>
       <label className="flex flex-col gap-0.5 min-w-0" title={t('transparentHint')}>
         <span className="text-gray-400 dark:text-gray-500 ml-1">{t('transparentBackground')}</span>
-        <Select
+        <Select portal
           value={params.transparent_output ? params.transparent_method ?? 'native' : 'off'}
           onChange={(value) => setParams({
             transparent_output: value !== 'off',
@@ -1110,7 +1053,7 @@ export default function InputBar() {
       </label>
       <label className="flex flex-col gap-0.5 min-w-0" title={t('streamPreviewHint')}>
         <span className="text-gray-400 dark:text-gray-500 ml-1">{t('streamPreview')}</span>
-        <Select value={params.stream && !isFalProvider ? 'on' : 'off'}
+        <Select portal value={params.stream && !isFalProvider ? 'on' : 'off'}
           onChange={(value) => setParams({ stream: value === 'on' })}
           disabled={isFalProvider}
           options={[{ label: t('disabled'), value: 'off' }, { label: t('enabled'), value: 'on' }]}
@@ -1193,129 +1136,45 @@ export default function InputBar() {
         />
       )}
 
-      <div data-input-bar className="fixed bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 z-30 w-full max-w-4xl px-3 sm:px-4 transition-all duration-300">
-        {(batchMode || selectedTaskIds.length > 0) && (
-          <div data-no-drag-select className="mb-3 flex justify-center">
-            <div className="flex max-w-full flex-wrap items-center justify-center gap-1 rounded-2xl border border-white/10 bg-gray-800/95 p-2 text-xs text-white shadow-lg backdrop-blur" role="toolbar" aria-label={t('batchActions')}>
-              <span className="px-2" aria-live="polite">{t('batchSelected', { count: selectedTasks.length, images: imageCount })}</span>
-              <GroupPicker taskIds={selectedTasks.map((task) => task.id)} batch />
-              <button type="button" onClick={handleSelectAllToggle} className="rounded-lg px-2 py-2 text-blue-300 hover:bg-white/10">
-                {t(allVisibleSelected ? 'cancelSelectAll' : 'selectCurrentPage')}
-              </button>
-              <button type="button" onClick={handleDownloadSelected} disabled={downloading || imageCount === 0}
-                className="rounded-lg px-2 py-2 text-green-300 hover:bg-white/10 disabled:opacity-40">
-                {t(downloading ? 'batchDownloading' : 'batchDownload')}
-              </button>
-              <button type="button" onClick={handleToggleFavorite} disabled={!selectedTasks.length}
-                className="rounded-lg px-2 py-2 text-yellow-300 hover:bg-white/10 disabled:opacity-40">{t('favoriteOrUnfavorite')}</button>
-              <button type="button" onClick={handleDeleteSelected} disabled={!selectedTasks.length || downloading}
-                className="rounded-lg px-2 py-2 text-red-300 hover:bg-white/10 disabled:opacity-40">{t('batchDelete')}</button>
-              <button type="button" onClick={() => { clearSelection(); setBatchMode(false) }}
-                className="rounded-lg px-2 py-2 text-gray-300 hover:bg-white/10">{t('exitBatch')}</button>
-            </div>
+      <aside data-input-bar aria-label={t('generationPanel')} className="generation-sidebar">
+        <div className="generation-panel bg-white/90 dark:bg-gray-900/90 border border-gray-200/80 dark:border-white/[0.08] shadow-lg rounded-2xl">
+          <div className={'flex shrink-0 items-center gap-2 ' + (collapsed ? 'justify-center p-2' : 'justify-between p-4')}>
+            {!collapsed && <h2 className="text-sm font-semibold">{t('generationPanel')}</h2>}
+            <button
+              type="button"
+              onClick={onToggle}
+              aria-expanded={!collapsed}
+              aria-controls="generation-panel-content"
+              aria-label={t(collapsed ? 'expandGenerationPanel' : 'collapseGenerationPanel')}
+              title={t(collapsed ? 'expandGenerationPanel' : 'collapseGenerationPanel')}
+              className="flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl px-2.5 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-white/[0.06] focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
+            >
+              <svg aria-hidden="true" className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <rect x="3" y="4" width="18" height="16" rx="2" strokeWidth={1.5} />
+                <path d="M9 4v16" strokeWidth={1.5} />
+                <path d={collapsed ? 'm13 9 3 3-3 3' : 'm16 9-3 3 3 3'} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              <span className={collapsed ? 'text-xs md:hidden' : 'text-xs'}>{t(collapsed ? 'expandGenerationPanel' : 'collapseGenerationPanel')}</span>
+            </button>
           </div>
-        )}
-        <div ref={cardRef} className="bg-white/70 dark:bg-gray-900/70 backdrop-blur-2xl border border-white/50 dark:border-white/[0.08] shadow-[0_8px_30px_rgb(0,0,0,0.08)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.3)] rounded-2xl sm:rounded-3xl p-3 sm:p-4 ring-1 ring-black/5 dark:ring-white/10">
-          {/* 移动端拖动条 */}
-          <div
-            ref={handleRef}
-            className="sm:hidden flex justify-center pt-0.5 pb-2 -mt-1 cursor-pointer touch-none"
-            onClick={() => setMobileCollapsed((v) => !v)}
-          >
-            <div className={`w-10 h-1 rounded-full bg-gray-300 dark:bg-white/[0.06] transition-transform duration-200 ${mobileCollapsed ? 'scale-x-75' : ''}`} />
-          </div>
+          {/* 仅隐藏内容而不卸载，保留输入草稿、参数编辑状态和参考图。 */}
+          <div id="generation-panel-content" className="generation-panel-body" hidden={collapsed}>
+            {inputImages.length > 0 && renderImageThumbs()}
 
-          {/* 输入图片行（移动端可折叠） */}
-          {inputImages.length > 0 && (
-            isMobile ? (
-              <>
-                <div className={`collapse-section${mobileCollapsed ? ' collapsed' : ''}`}>
-                  <div className="collapse-inner">
-                    {renderImageThumbs()}
-                  </div>
-                </div>
-                {mobileCollapsed && (
-                  <div className="text-xs text-gray-400 dark:text-gray-500 mb-2 ml-1">
-                    {maskDraft ? t('maskSummary', { count: referenceImages.length }) : t('referenceSummary', { count: inputImages.length })}
-                  </div>
-                )}
-              </>
-            ) : (
-              renderImageThumbs()
-            )
-          )}
+            {/* 输入框 */}
+            <textarea
+              ref={textareaRef}
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              onKeyDown={handleKeyDown}
+              rows={4}
+              aria-label={t('promptPlaceholder')}
+              placeholder={t('promptPlaceholder')}
+              className="w-full px-4 py-3 rounded-2xl border border-gray-200/60 dark:border-white/[0.08] bg-white/50 dark:bg-white/[0.03] text-sm focus:outline-none leading-relaxed resize-none shadow-sm transition-[border-color,box-shadow] duration-200"
+            />
 
-          {/* 输入框 */}
-          <textarea
-            ref={textareaRef}
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            onKeyDown={handleKeyDown}
-            rows={1}
-            placeholder={t('promptPlaceholder')}
-            className="w-full px-4 py-3 rounded-2xl border border-gray-200/60 dark:border-white/[0.08] bg-white/50 dark:bg-white/[0.03] text-sm focus:outline-none leading-relaxed resize-none shadow-sm transition-[border-color,box-shadow] duration-200"
-          />
-
-          {/* 参数 + 按钮 */}
-          <div className="mt-3">
-            {/* 桌面端布局 */}
-            <div className="hidden sm:flex items-end justify-between gap-3">
-              {renderParams('grid-cols-5')}
-
-              <div className="flex gap-2 flex-shrink-0 mb-0.5">
-                <div
-                  className="relative"
-                  onMouseEnter={() => setAttachHover(true)}
-                  onMouseLeave={() => setAttachHover(false)}
-                >
-                  <ButtonTooltip visible={atImageLimit && attachHover} text={t('imageLimitReachedToast', { count: API_MAX_IMAGES })} />
-                  <button
-                    onClick={() => !atImageLimit && fileInputRef.current?.click()}
-                    className={`p-2.5 rounded-xl transition-all shadow-sm ${
-                      atImageLimit
-                        ? 'bg-gray-200 dark:bg-white/[0.04] text-gray-300 dark:text-gray-500 cursor-not-allowed'
-                        : 'bg-gray-200 dark:bg-white/[0.06] hover:bg-gray-300 dark:hover:bg-white/[0.1] text-gray-500 dark:text-gray-300 hover:shadow'
-                    }`}
-                    title={atImageLimit ? t('imageLimitReached', { count: API_MAX_IMAGES }) : t('addReferenceImage')}
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-                    </svg>
-                  </button>
-                </div>
-                <div
-                  className="relative"
-                  onMouseEnter={() => setSubmitHover(true)}
-                  onMouseLeave={() => setSubmitHover(false)}
-                >
-                  <ButtonTooltip visible={!settings.apiKey && submitHover} text={t('configureApiFirstTooltip')} />
-                  <button
-                    onClick={() => settings.apiKey ? submitTask() : setShowSettings(true)}
-                    disabled={settings.apiKey ? !canSubmit : false}
-                    className={`p-2.5 rounded-xl transition-all shadow-sm hover:shadow ${
-                      !settings.apiKey
-                        ? 'bg-gray-300 dark:bg-white/[0.06] text-white cursor-pointer'
-                        : 'bg-blue-500 text-white hover:bg-blue-600 disabled:bg-gray-300 dark:disabled:bg-white/[0.04] disabled:opacity-50 disabled:cursor-not-allowed'
-                    }`}
-                    title={settings.apiKey ? (maskDraft ? t('maskEditShortcut') : t('generateShortcut')) : t('configureApiFirst')}
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* 移动端布局 */}
-            <div className="sm:hidden flex flex-col gap-2">
-              <div className={`collapse-section${mobileCollapsed ? ' collapsed' : ''}`}>
-                <div className="collapse-inner">
-                  {renderParams('grid-cols-2', 'col-span-2')}
-                  <div className="h-2" />
-                </div>
-              </div>
-
+            <div className="mt-4 flex flex-col gap-4">
+              {renderParams('grid-cols-2', 'col-span-2')}
               <div className="flex items-center gap-2">
                 <div
                   className="relative"
@@ -1360,18 +1219,18 @@ export default function InputBar() {
                 </div>
               </div>
             </div>
-          </div>
 
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            multiple
-            className="hidden"
-            onChange={handleFileUpload}
-          />
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={handleFileUpload}
+            />
+          </div>
         </div>
-      </div>
+      </aside>
     </>
   )
 }
