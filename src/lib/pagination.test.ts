@@ -4,11 +4,12 @@ import { useStore } from '../store'
 import { DEFAULT_PARAMS, type TaskRecord } from '../types'
 
 describe('gallery pagination', () => {
-  it('shows nine records and keeps the final partial page', () => {
-    const items = Array.from({ length: 23 }, (_, i) => i)
-    expect(paginateItems(items, 1).items).toEqual(items.slice(0, 9))
-    expect(paginateItems(items, 2).items).toEqual(items.slice(9, 18))
-    expect(paginateItems(items, 3)).toMatchObject({ items: [18, 19, 20, 21, 22], start: 19, end: 23, total: 23, totalPages: 3 })
+  it('shows fifteen records and keeps the final partial page', () => {
+    // 覆盖连续两页与不足一页的尾页，防止分页边界出现遗漏或重复。
+    const items = Array.from({ length: 35 }, (_, i) => i)
+    expect(paginateItems(items, 1).items).toEqual(items.slice(0, 15))
+    expect(paginateItems(items, 2).items).toEqual(items.slice(15, 30))
+    expect(paginateItems(items, 3)).toMatchObject({ items: [30, 31, 32, 33, 34], start: 31, end: 35, total: 35, totalPages: 3 })
   })
   it('clamps removed pages and empty results without invalid ranges', () => {
     expect(paginateItems([1, 2], 4)).toMatchObject({ page: 1, totalPages: 1, items: [1, 2] })

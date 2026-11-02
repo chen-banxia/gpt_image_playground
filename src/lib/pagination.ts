@@ -1,5 +1,5 @@
-// 桌面三列布局每页正好三行，所有展示与批量选择共用此页容量。
-export const GALLERY_PAGE_SIZE = 9
+// 列表展示与批量选择共用每页 15 条的容量，避免全选操作跨页。
+export const GALLERY_PAGE_SIZE = 15
 
 /** 筛选后分页；删除末页记录时回到最后一个有效页，空列表仍保留第 1 页。 */
 export function paginateItems<T>(items: T[], requestedPage: number) {
