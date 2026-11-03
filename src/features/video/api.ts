@@ -1,6 +1,7 @@
 import { tCurrent as t } from '../../i18n'
 import type { GenerationState, VideoProtocol, VideoRoute } from './types'
 import { validateVideoRoute, VIDEO_PROVIDERS } from './providers'
+import { normalizeVideoSubmitTimeout, VIDEO_QUERY_TIMEOUT } from './timeouts'
 export const VIDEO_PATH = '/doubao/api/v3/contents/generations/tasks'
 export const isUnsupportedVideoModelError = (error?: string) => /model\s+["']?[^\n]*?\bis not served by (?:this|the) plugin/i.test(error ?? '')
 export function normalizeGateway(value: string) {
@@ -22,27 +23,47 @@ export function safeMediaUrl(value: unknown): string | undefined {
 export class VideoApiError extends Error {
   constructor(message: string, public status = 0, public retryAfter?: number) { super(message) }
 }
-export async function requestVideo(url: string, key: string, body?: unknown, signal?: AbortSignal) {
+export async function requestVideo(url: string, key: string, body?: unknown, signal?: AbortSignal, submitTimeoutSeconds?: number) {
   if (!key.trim()) throw new VideoApiError(t("请配置对应的视频 Key"), 401)
-  let response: Response
-  try { response = await fetch(url, { method: body === undefined ? 'GET' : 'POST', headers: { Authorization: `Bearer ${key.trim()}`, ...(body === undefined ? {} : { 'Content-Type': 'application/json' }) }, body: body === undefined ? undefined : JSON.stringify(body), signal: signal ?? AbortSignal.timeout(60000) }) }
-  catch (e) { throw new VideoApiError(e instanceof Error && e.name === 'TimeoutError' ? t("请求超时，请核对任务状态") : t("无法连接网关，请检查网络或跨域设置")) }
-  let data: any
-  try { data = await response.json() } catch { throw new VideoApiError(t("网关没有返回有效 JSON"), response.ok ? 0 : response.status) }
-  if (!response.ok) {
-    const retry = response.headers.get('Retry-After')
-    const seconds = retry ? (Number.isFinite(Number(retry)) ? Number(retry) : Math.max(0, (Date.parse(retry) - Date.now()) / 1000)) : undefined
-    const message = String(data?.error?.message ?? data?.message ?? t("请求失败 ({0})", { "0": response.status })).split(key).join(t("[已隐藏]"))
-    throw new VideoApiError(message.slice(0, 1000), response.status, seconds)
+  const submitting = body !== undefined
+  const timeout = submitting ? normalizeVideoSubmitTimeout(submitTimeoutSeconds) : VIDEO_QUERY_TIMEOUT
+  const controller = new AbortController()
+  let timedOut = false
+  const cancel = () => controller.abort(signal?.reason)
+  if (signal?.aborted) cancel()
+  else signal?.addEventListener('abort', cancel, { once: true })
+  const timer = setTimeout(() => { timedOut = true; controller.abort() }, timeout * 1000)
+  // 超时覆盖响应体读取，finally 清理定时器；外部取消也不会绕过超时保护。
+  try {
+    const response = await fetch(url, { method: submitting ? 'POST' : 'GET', headers: { Authorization: `Bearer ${key.trim()}`, ...(submitting ? { 'Content-Type': 'application/json' } : {}) }, body: submitting ? JSON.stringify(body) : undefined, signal: controller.signal })
+    let data: any
+    try { data = await response.json() } catch (error) {
+      if (controller.signal.aborted) throw error
+      throw new VideoApiError(t("网关没有返回有效 JSON"), response.ok ? 0 : response.status)
+    }
+    if (!response.ok) {
+      const retry = response.headers.get('Retry-After')
+      const seconds = retry ? (Number.isFinite(Number(retry)) ? Number(retry) : Math.max(0, (Date.parse(retry) - Date.now()) / 1000)) : undefined
+      const message = String(data?.error?.message ?? data?.message ?? t("请求失败 ({0})", { "0": response.status })).split(key).join(t("[已隐藏]"))
+      throw new VideoApiError(message.slice(0, 1000), response.status, seconds)
+    }
+    if (!data || typeof data !== 'object' || Array.isArray(data)) throw new VideoApiError(t("网关响应结构无效"))
+    if (data.base_resp && Number(data.base_resp.status_code) !== 0) {
+      const code = Number(data.base_resp.status_code)
+      throw new VideoApiError(String(data.base_resp.status_msg ?? t('网关响应结构无效')).split(key).join(t('[已隐藏]')), code === 1002 ? 429 : 400)
+    }
+    // GET 中 failed + error 是任务终态，不是查询请求失败。
+    if (data.error && (body !== undefined || !data.status)) throw new VideoApiError(String(data.error.message ?? t('生成失败')).split(key).join(t('[已隐藏]')), 400)
+    return data as Record<string, any>
+  } catch (error) {
+    if (timedOut) throw new VideoApiError(t(submitting ? '视频提交等待超过 {0} 秒，服务端可能已受理。请先核对 New API 任务记录，不要直接重复生成。' : '视频状态查询超过 {0} 秒，将稍后继续同步，不会重新提交生成。', { 0: timeout }))
+    if (signal?.aborted) throw new VideoApiError(t('视频请求已中断，服务端任务不一定取消。请核对任务状态。'))
+    if (error instanceof VideoApiError) throw error
+    throw new VideoApiError(t('无法连接网关，请检查网络或跨域设置'))
+  } finally {
+    clearTimeout(timer)
+    signal?.removeEventListener('abort', cancel)
   }
-  if (!data || typeof data !== 'object' || Array.isArray(data)) throw new VideoApiError(t("网关响应结构无效"))
-  if (data.base_resp && Number(data.base_resp.status_code) !== 0) {
-    const code = Number(data.base_resp.status_code)
-    throw new VideoApiError(String(data.base_resp.status_msg ?? t('网关响应结构无效')).split(key).join(t('[已隐藏]')), code === 1002 ? 429 : 400)
-  }
-  // GET 中 failed + error 是任务终态，不是查询请求失败。
-  if (data.error && (body !== undefined || !data.status)) throw new VideoApiError(String(data.error.message ?? t('生成失败')).split(key).join(t('[已隐藏]')), 400)
-  return data as Record<string, any>
 }
 export function createdVideoId(data: Record<string, any>, protocol: VideoProtocol) {
   const id = protocol === 'hailuo-h3' ? data.task_id : data.id

@@ -111,7 +111,7 @@ export async function submitVideo(retryOfTaskId?: string, sourceDraft?: VideoDra
     boundCredentials.set(task.id, credential.apiKey)
     await changed()
     attempted = true
-    const data = await requestVideo(videoEndpoint(root, undefined, settings.proxy, route), credential.apiKey, body)
+    const data = await requestVideo(videoEndpoint(root, undefined, settings.proxy, route), credential.apiKey, body, undefined, settings.submitTimeoutSeconds)
     const gatewayTaskId = createdVideoId(data, route.protocol)
     if (!gatewayTaskId) throw new VideoApiError(t("未取得网关任务 ID，请先核对 New API 记录，避免重复提交"))
     accepted = true

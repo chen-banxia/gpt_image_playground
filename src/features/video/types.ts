@@ -74,6 +74,7 @@ export interface VideoTask {
 export interface VideoCredential { apiKey: string; remember: boolean; revision: string }
 export interface VideoSettings {
   gatewayBaseUrl: string
+  submitTimeoutSeconds?: number
   proxy: boolean
   routes?: Record<KeySlot, VideoRoute>
   doubaoVideo: VideoCredential

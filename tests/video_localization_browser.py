@@ -40,7 +40,7 @@ with sync_playwright() as p:
     assert not re.search(r'[\u3400-\u9fff]',settings.inner_text())
     settings.get_by_label('New API gateway root URL').fill('https://example.com/v1')
     settings.get_by_role('button',name='Save video settings').click()
-    expect(settings.get_by_role('status')).to_contain_text('without /v1')
+    expect(page.locator('[data-settings-feedback]').get_by_role('alert')).to_contain_text('without /v1')
     page.get_by_role('button',name='Close',exact=True).click()
     page.get_by_role('button',name='Manage groups',exact=True).click()
     expect(page.get_by_role('dialog',name='Manage groups')).to_be_visible()

@@ -1,6 +1,7 @@
 import { useVideoMessage } from '../../hooks/useVideoMessage'
 import { useT } from '../../hooks/useI18n'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { DEFAULT_VIDEO_GATEWAY, useVideoSettings } from './settings'
 import { normalizeGateway } from './api'
 import { configuredVideoRoute, VIDEO_PROVIDERS } from './providers'
@@ -9,6 +10,7 @@ import { cleanVideoAssets, message, resetVideo } from './store'
 import { useVideoDownloads } from './downloads'
 import { exportVideoBackup, importVideoBackup } from './backup'
 import { useStore } from '../../store'
+import { MAX_VIDEO_SUBMIT_TIMEOUT, normalizeVideoSubmitTimeout } from './timeouts'
 
 export const fieldClass = 'w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm dark:border-white/10 dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500'
 export const buttonClass = 'rounded-lg border border-gray-200 px-3 py-2 text-sm hover:bg-gray-100 disabled:opacity-40 dark:border-white/10 dark:hover:bg-white/10'
@@ -19,23 +21,34 @@ export default function VideoSettings() {
   const save = useVideoSettings(s => s.save)
   const [draft, setDraft] = useState(() => ({ ...settings, routes: { doubaoVideo: configuredVideoRoute(settings, 'doubaoVideo'), hailuoVideo: configuredVideoRoute(settings, 'hailuoVideo') } }))
   const [visible, setVisible] = useState<Record<string, boolean>>({})
-  const [feedback, setFeedback] = useState('')
+  const [feedback, setFeedback] = useState<{ message: string; type: 'success' | 'error'; save?: boolean } | null>(null)
+  useEffect(() => {
+    // 成功反馈自动收起；错误持续显示，给用户足够时间阅读并修正配置。
+    if (!feedback || feedback.type === 'error') return
+    const timer = window.setTimeout(() => setFeedback(null), 5000)
+    return () => window.clearTimeout(timer)
+  }, [feedback])
+  const [timeoutInput, setTimeoutInput] = useState(String(normalizeVideoSubmitTimeout(settings.submitTimeoutSeconds)))
   const [busy, setBusy] = useState(false)
   const downloading = useVideoDownloads(s => s.busy)
-  const run = async (fn: () => Promise<string>) => { setBusy(true); try { setFeedback(await fn()) } catch (e) { setFeedback(message(e)) } finally { setBusy(false) } }
+  const run = async (fn: () => Promise<string>) => { setBusy(true); try { setFeedback({ message: await fn(), type: 'success' }) } catch (e) { setFeedback({ message: message(e), type: 'error' }) } finally { setBusy(false) } }
   const commit = () => {
     try {
-      const next = { ...draft, gatewayBaseUrl: normalizeGateway(draft.gatewayBaseUrl.trim() || DEFAULT_VIDEO_GATEWAY) }
+      const timeout = Number(timeoutInput)
+      if (!Number.isInteger(timeout) || timeout < 1 || timeout > MAX_VIDEO_SUBMIT_TIMEOUT) throw new Error(t('提交超时请输入 1–600 秒的整数'))
+      const next = { ...draft, submitTimeoutSeconds: timeout, gatewayBaseUrl: normalizeGateway(draft.gatewayBaseUrl.trim() || DEFAULT_VIDEO_GATEWAY) }
       next.routes = { doubaoVideo: configuredVideoRoute(next, 'doubaoVideo'), hailuoVideo: configuredVideoRoute(next, 'hailuoVideo') }
       for (const slot of ['doubaoVideo', 'hailuoVideo'] as KeySlot[]) next[slot] = { ...draft[slot], apiKey: draft[slot].apiKey.trim(), revision: draft[slot].apiKey.trim() !== settings[slot].apiKey ? crypto.randomUUID() : settings[slot].revision }
-      save(next); setDraft(next); setFeedback(t("视频配置已保存。模型会自动选择对应 Key，不会借用生图 Key。"))
-    } catch (e) { setFeedback(message(e)) }
+      save(next); setDraft(next); setFeedback({ message: t("视频配置已保存。模型会自动选择对应 Key，不会借用生图 Key。"), type: 'success', save: true })
+    } catch (e) { setFeedback({ message: message(e), type: 'error', save: true }) }
   }
   return <section className="space-y-4 border-t pt-5 dark:border-white/10" aria-label={t("视频接口设置")}>
     <h4 className="font-semibold">{t("视频接口 · New API")}</h4>
     <p className="text-xs text-gray-500">{t('视频按模型选择对应的 Key、创建路径、查询路径和协议。生图配置独立保留。')}</p>
     <label className="block text-sm">{t("New API 网关根地址")}<input className={`${fieldClass} mt-1`} placeholder={DEFAULT_VIDEO_GATEWAY} value={draft.gatewayBaseUrl} onChange={e => setDraft({ ...draft, gatewayBaseUrl: e.target.value })} /></label>
     <p className="text-xs text-gray-500">{t("不包含 /v1 或任务路径；使用 HTTPS 页面时网关也应为 HTTPS。")}</p>
+    <label className="block text-sm">{t('视频提交超时（秒）')}<input type="number" min={1} max={MAX_VIDEO_SUBMIT_TIMEOUT} step={1} className={`${fieldClass} mt-1`} value={timeoutInput} onChange={e => setTimeoutInput(e.target.value)} /></label>
+    <p className="text-xs leading-relaxed text-gray-500">{t('默认 600 秒（10 分钟），用于上传素材并等待任务 ID，不是视频生成总时长。查询超时为 60 秒，失败后继续同步；修改仅影响之后发起的请求。')}</p>
     {(['doubaoVideo', 'hailuoVideo'] as KeySlot[]).map(slot => <div key={slot} className="space-y-2">
       <label className="block text-sm">{slot === 'doubaoVideo' ? t("豆包视频 API Key") : t("海螺视频 API Key")}
         <div className="mt-1 flex gap-2"><input aria-label={slot === 'doubaoVideo' ? t("豆包视频 API Key") : t("海螺视频 API Key")} autoComplete="off" className={fieldClass} type={visible[slot] ? 'text' : 'password'} value={draft[slot].apiKey} onChange={e => setDraft({ ...draft, [slot]: { ...draft[slot], apiKey: e.target.value } })} /><button type="button" className={buttonClass} aria-label={t("显示{0} Key", { "0": slot === 'doubaoVideo' ? t("豆包") : t("海螺") })} onClick={() => setVisible({ ...visible, [slot]: !visible[slot] })}>{visible[slot] ? t("隐藏") : t("显示")}</button></div>
@@ -65,6 +78,19 @@ export default function VideoSettings() {
       <button disabled={busy || downloading} className={buttonClass} onClick={() => { if (window.confirm(t("清空视频历史？不会取消远端生成；保留当前视频草稿、图片记录和 Key。"))) void run(async () => { await resetVideo(false); return t("视频历史已清空，草稿已保留。") }) }}>{t("清空视频历史")}</button>
       <button disabled={busy || downloading} className={`${buttonClass} text-red-500`} onClick={() => { if (window.confirm(t("重置视频工作台的全部历史、草稿及输入素材？保留图片、公共分组和 API 配置。"))) void run(async () => { await resetVideo(true); return t("视频本地数据已重置。") }) }}>{t("重置视频数据")}</button>
     </div>
-    {feedback && <p role="status" className="rounded-lg bg-blue-50 p-3 text-xs text-blue-700 dark:bg-blue-500/10 dark:text-blue-300">{localize(feedback)}</p>}
+    {/* 挂载到页面根部，避免保存按钮位于长面板底部时反馈被滚动区域遮住。 */}
+    {feedback && createPortal(
+      <div data-settings-feedback className="pointer-events-none fixed inset-x-4 top-[max(1rem,env(safe-area-inset-top))] z-[150] flex justify-center">
+        <div role={feedback.type === 'error' ? 'alert' : 'status'} aria-atomic="true"
+          className={`pointer-events-auto flex w-full max-w-lg items-start gap-3 rounded-2xl border p-4 shadow-2xl ${feedback.type === 'success' ? 'border-emerald-300 bg-emerald-50 text-emerald-950 dark:border-emerald-600 dark:bg-emerald-950 dark:text-emerald-100' : 'border-red-300 bg-red-50 text-red-950 dark:border-red-600 dark:bg-red-950 dark:text-red-100'}`}>
+          <span aria-hidden="true" className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-lg font-bold text-white ${feedback.type === 'success' ? 'bg-emerald-600' : 'bg-red-600'}`}>{feedback.type === 'success' ? '✓' : '!'}</span>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold">{t(feedback.save ? feedback.type === 'success' ? '保存成功' : '保存失败' : feedback.type === 'success' ? '操作成功' : '操作失败')}</p>
+            <p className="mt-1 break-words text-sm leading-relaxed">{localize(feedback.message)}</p>
+          </div>
+          <button type="button" aria-label={t('关闭提示')} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-xl hover:bg-black/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-current dark:hover:bg-white/10" onClick={() => setFeedback(null)}>×</button>
+        </div>
+      </div>, document.body,
+    )}
   </section>
 }

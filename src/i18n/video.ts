@@ -1,5 +1,15 @@
 /** 视频文案使用原中文作稳定键，统一接入应用语言设置；插值不翻译用户内容。 */
 export const videoEn = {
+  "保存成功": "Settings saved",
+  "保存失败": "Could not save settings",
+  "操作成功": "Operation completed",
+  "操作失败": "Operation failed",
+  "视频提交超时（秒）": "Video submission timeout (seconds)",
+  "提交超时请输入 1–600 秒的整数": "Enter a whole number from 1 to 600 seconds for the submission timeout",
+  "默认 600 秒（10 分钟），用于上传素材并等待任务 ID，不是视频生成总时长。查询超时为 60 秒，失败后继续同步；修改仅影响之后发起的请求。": "Default: 600 seconds (10 minutes) to upload media and receive a task ID, not the total generation time. Status queries time out after 60 seconds and retry later. Changes apply to subsequent requests only.",
+  "视频提交等待超过 {0} 秒，服务端可能已受理。请先核对 New API 任务记录，不要直接重复生成。": "Video submission exceeded {0} seconds. The server may have accepted it. Check New API task history before submitting again.",
+  "视频状态查询超过 {0} 秒，将稍后继续同步，不会重新提交生成。": "The status query exceeded {0} seconds. Synchronization will retry later without resubmitting generation.",
+  "视频请求已中断，服务端任务不一定取消。请核对任务状态。": "The video request was interrupted. The server task may still be running. Check its status.",
   "正在加载视频预览…": "Loading video preview…",
   "预览暂不可用，可打开详情播放或刷新链接": "Preview unavailable. Open details to play or refresh the URL.",
   "视频接口协议无效": "Invalid video API protocol",

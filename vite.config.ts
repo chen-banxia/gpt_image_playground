@@ -33,6 +33,8 @@ export default defineConfig(({ command }) => {
         ...(process.env.VIDEO_API_PROXY_URL ? {
           '/video-api-proxy': {
             target: process.env.VIDEO_API_PROXY_URL,
+            timeout: 630000,
+            proxyTimeout: 630000,
             changeOrigin: true,
             rewrite: (path: string) => path.replace(/^\/video-api-proxy/, ''),
             configure: (proxy: any) => proxy.on('proxyReq', (proxyReq: any, req: any, res: any) => {

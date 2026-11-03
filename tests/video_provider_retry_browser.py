@@ -37,7 +37,7 @@ with sync_playwright() as p:
     # Invalid paths are refused; relative aliases can be saved and later restored.
     settings.get_by_label('H3 创建任务路径').fill('https://other.example/create')
     settings.get_by_role('button',name='保存视频配置').click()
-    expect(settings.get_by_role('status')).to_contain_text('接口路径')
+    expect(page.locator('[data-settings-feedback]').get_by_role('alert')).to_contain_text('接口路径')
     settings.get_by_label('H3 创建任务路径').fill('/hailuo/v1/video_generation')
     settings.get_by_label('H3 查询任务路径').fill('/hailuo/v1/query/video_generation/{task_id}')
     settings.get_by_role('button',name='保存视频配置').click()
