@@ -1,0 +1,116 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="930" viewBox="0 0 1400 930" role="img" aria-labelledby="title desc">
+  <title id="title">视频工作台页面设计示意</title>
+  <desc id="desc">顶部切换图片和视频工作台。左侧只有一个生成入口，高级参数可设置首尾帧或全能参考。图中展示默认首尾帧槽位和提示。右侧显示每页十五条分页与作品。</desc>
+  <defs>
+    <linearGradient id="cover" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#243548"/>
+      <stop offset="1" stop-color="#17212e"/>
+    </linearGradient>
+    <style>
+      text {font-family:"Microsoft YaHei","PingFang SC",sans-serif;fill:#e7e9ee;font-size:16px}
+      .small {font-size:14px;fill:#aeb6c5}
+      .label {font-size:14px;fill:#9fa7b5}
+      .head {font-size:18px;font-weight:600}
+      .blue {fill:#a9caff}
+      .green {fill:#90d7b3}
+      .muted {fill:#7e899c}
+      .field {fill:#20242c;stroke:#353b47}
+      .card {fill:#181c23;stroke:#343a45}
+    </style>
+  </defs>
+  <rect width="1400" height="930" fill="#0e1117"/>
+  <rect width="1400" height="72" fill="#151922"/>
+  <text x="28" y="44" font-size="22" font-weight="700">创作工作台</text>
+  <text x="222" y="43" class="small">图片工作台</text>
+  <rect x="340" y="15" width="138" height="42" rx="10" fill="#223d64"/>
+  <text x="362" y="43" class="blue">视频工作台</text>
+  <text x="1136" y="43" class="small">任务 2 个进行中</text>
+  <text x="1314" y="43" class="small">设置</text>
+
+  <text x="414" y="115" class="head">视频作品</text>
+  <text x="520" y="115" class="small">生成的视频与输入素材统一管理</text>
+  <rect x="414" y="136" width="154" height="40" rx="9" class="field"/>
+  <text x="429" y="162">全部分组 ▾</text>
+  <rect x="580" y="136" width="130" height="40" rx="9" class="field"/>
+  <text x="595" y="162">全部状态 ▾</text>
+  <rect x="722" y="136" width="130" height="40" rx="9" class="field"/>
+  <text x="737" y="162">全部模型 ▾</text>
+  <rect x="864" y="136" width="352" height="40" rx="9" class="field"/>
+  <text x="880" y="162" class="small">搜索视频描述或任务</text>
+  <rect x="1228" y="136" width="142" height="40" rx="9" class="field"/>
+  <text x="1263" y="162">批量操作</text>
+  <text x="414" y="211" class="small">共 38 条 · 每页 15 条</text>
+  <text x="1104" y="211" class="small">上一页　 1 / 3　 下一页</text>
+
+  <rect x="28" y="238" width="356" height="622" rx="17" class="card"/>
+  <text x="48" y="272" class="head">视频创作</text>
+  <text x="305" y="272" class="small">收起 ‹</text>
+  <text x="48" y="315" class="small">输入描述，按需添加图片即可生成</text>
+  <text x="48" y="346" class="label">模型 · 自动使用豆包视频配置</text>
+  <rect x="48" y="367" width="316" height="38" rx="8" class="field"/>
+  <text x="62" y="392">豆包 · Seedance 2.0</text>
+  <text x="340" y="392" class="small">▾</text>
+  <text x="48" y="435" class="label">描述画面 动作与镜头变化</text>
+  <rect x="48" y="447" width="316" height="91" rx="10" class="field"/>
+  <text x="62" y="476">晨光下的海岸，镜头缓慢推进，</text>
+  <text x="62" y="502">海浪轻轻拍打沙滩……</text>
+  <text x="48" y="558" class="small">首尾帧模式</text>
+  <text x="276" y="558" class="blue">更改方式</text>
+  <rect x="48" y="569" width="152" height="49" rx="8" fill="#182536" stroke="#486786" stroke-dasharray="5 4"/>
+  <text x="62" y="599" class="small">＋ 首帧 · 开始画面</text>
+  <rect x="212" y="569" width="152" height="49" rx="8" fill="#182536" stroke="#486786" stroke-dasharray="5 4"/>
+  <text x="226" y="599" class="small">＋ 尾帧 · 结束画面</text>
+  <text x="48" y="644" class="small">未添加图片，将根据描述生成</text>
+  <text x="48" y="670" class="label">时长</text>
+  <text x="212" y="670" class="label">分辨率</text>
+  <rect x="48" y="680" width="152" height="35" rx="8" class="field"/>
+  <text x="62" y="704">5 秒</text>
+  <rect x="212" y="680" width="152" height="35" rx="8" class="field"/>
+  <text x="226" y="704">720p</text>
+  <text x="48" y="744" class="small">比例：16:9 ▾　　　高级参数 ▾</text>
+  <text x="48" y="778" class="label">产品宣传 · 生成 1 条</text>
+  <rect x="48" y="796" width="316" height="44" rx="10" fill="#3678e8"/>
+  <text x="163" y="825" font-weight="600">生成视频 →</text>
+
+  <rect x="414" y="238" width="466" height="300" rx="14" class="card"/>
+  <path d="M428 238h438a14 14 0 0 1 14 14v166H414V252a14 14 0 0 1 14-14" fill="url(#cover)"/>
+  <circle cx="647" cy="326" r="28" fill="#0b1423" opacity=".7"/>
+  <path d="M640 312l21 14-21 14z" fill="#e2eaf7"/>
+  <text x="432" y="270" class="green">已生成 · 已发起下载</text>
+  <text x="780" y="399" class="small">00:05</text>
+  <text x="432" y="449">产品展示 · 镜头缓慢推进</text>
+  <text x="432" y="478" class="small">豆包 Seedance 2.5　720p　5 秒</text>
+  <text x="432" y="514" class="small">产品宣传</text>
+  <text x="669" y="514" class="blue">下载　复用　更多</text>
+
+  <rect x="904" y="238" width="466" height="300" rx="14" class="card"/>
+  <path d="M918 238h438a14 14 0 0 1 14 14v166H904V252a14 14 0 0 1 14-14" fill="#1f2838"/>
+  <circle cx="1137" cy="315" r="25" fill="none" stroke="#557db7" stroke-width="4" stroke-dasharray="105 52"/>
+  <text x="1104" y="369" class="blue">生成中</text>
+  <text x="1078" y="396" class="small">已等待 1 分 20 秒</text>
+  <text x="922" y="449">海边行走 · 自然跟拍</text>
+  <text x="922" y="478" class="small">海螺 H3　768P　5 秒</text>
+  <text x="922" y="514" class="small">旅行素材</text>
+  <text x="1262" y="514" class="blue">查看详情</text>
+
+  <rect x="414" y="556" width="466" height="300" rx="14" class="card"/>
+  <path d="M428 556h438a14 14 0 0 1 14 14v166H414V570a14 14 0 0 1 14-14" fill="#242938"/>
+  <text x="614" y="650" class="small">排队中</text>
+  <text x="564" y="681" class="small">任务已提交，可切换页面</text>
+  <text x="432" y="767">晨光中的咖啡馆</text>
+  <text x="432" y="796" class="small">豆包 Seedance 2.0 Fast　720p　5 秒</text>
+  <text x="432" y="832" class="small">生活记录</text>
+  <text x="772" y="832" class="blue">查看详情</text>
+
+  <rect x="904" y="556" width="466" height="300" rx="14" class="card"/>
+  <path d="M918 556h438a14 14 0 0 1 14 14v166H904V570a14 14 0 0 1 14-14" fill="#29332f"/>
+  <circle cx="1137" cy="642" r="28" fill="#101c19" opacity=".8"/>
+  <path d="M1130 628l21 14-21 14z" fill="#dceae4"/>
+  <text x="922" y="589" class="green">已生成 · 可播放下载</text>
+  <text x="922" y="767">雨后城市 · 固定镜头</text>
+  <text x="922" y="796" class="small">豆包 Seedance 2.5　720p　5 秒</text>
+  <text x="922" y="832" class="small">场景试验</text>
+  <text x="1262" y="832" class="blue">查看详情</text>
+
+  <text x="28" y="900" class="small">设计示意　统一入口　·　高级参数选择素材使用方式　·　附件区持续展示素材用途和操作提示</text>
+</svg>

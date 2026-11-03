@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="1010" viewBox="0 0 1400 1010" role="img" aria-labelledby="title desc">
+  <title id="title">视频高级参数的首尾帧和全能参考模式</title>
+  <desc id="desc">两个示例面板展示同一生成入口中的素材使用方式。首尾帧有开始和结束画面槽位，全能参考有按用途标记的素材。切换时说明用途变化，保留原素材草稿；不可用能力明确解释原因。</desc>
+  <style>
+    text {font-family:"Microsoft YaHei","PingFang SC",sans-serif;font-size:17px;fill:#e7e9ee}
+    .small {font-size:15px;fill:#b4bdcd}
+    .label {font-size:15px;fill:#9faabc}
+    .heading {font-size:22px;font-weight:600}
+    .blue {fill:#b4d2ff}
+    .muted {fill:#8793a7}
+    .card {fill:#191e28;stroke:#384151}
+    .field {fill:#232a36;stroke:#3d485b}
+    .warn {fill:#efd49c}
+  </style>
+  <rect width="1400" height="1010" fill="#0f131b"/>
+  <text x="40" y="50" font-size="26" font-weight="700">高级参数 · 素材使用方式</text>
+  <text x="40" y="83" class="small">一个描述框，一个生成入口；选择素材怎样参与生成。</text>
+
+  <rect x="40" y="112" width="644" height="672" rx="16" class="card"/>
+  <rect x="716" y="112" width="644" height="672" rx="16" class="card"/>
+  <text x="64" y="151" class="heading">首尾帧模式</text>
+  <text x="740" y="151" class="heading">全能参考模式</text>
+  <rect x="64" y="172" width="286" height="42" rx="8" fill="#294a79"/>
+  <text x="164" y="200" class="blue">首尾帧模式</text>
+  <text x="469" y="200" class="small">全能参考模式</text>
+  <text x="840" y="200" class="small">首尾帧模式</text>
+  <rect x="1050" y="172" width="286" height="42" rx="8" fill="#294a79"/>
+  <text x="1141" y="200" class="blue">全能参考模式</text>
+
+  <text x="64" y="249" class="small">首帧决定开始画面，尾帧引导结束画面。</text>
+  <text x="64" y="277" class="small">不添加图片也可根据描述生成，尾帧可选。</text>
+  <text x="740" y="249" class="small">参考人物、场景、动作或声音，不指定起止画面。</text>
+  <text x="740" y="277" class="small">可添加的类型与数量随当前模型变化。</text>
+
+  <rect x="64" y="300" width="274" height="142" rx="10" fill="#243647" stroke="#4b6984"/>
+  <rect x="386" y="300" width="274" height="142" rx="10" fill="#353447" stroke="#666082"/>
+  <text x="80" y="329" class="blue">首帧 · 开始画面</text>
+  <text x="402" y="329" class="blue">尾帧 · 结束画面</text>
+  <text x="153" y="381">人物站立</text>
+  <text x="475" y="381">人物坐下</text>
+  <text x="80" y="422" class="small">替换　移除</text>
+  <text x="402" y="422" class="small">替换　移除</text>
+  <text x="350" y="375" class="blue">⇄</text>
+  <text x="64" y="471" class="label">可交换首尾；只添加尾帧时会提示先补首帧。</text>
+
+  <rect x="740" y="300" width="286" height="142" rx="10" fill="#243647" stroke="#4b6984"/>
+  <rect x="1050" y="300" width="286" height="142" rx="10" fill="#283d36" stroke="#4d7466"/>
+  <text x="756" y="329" class="blue">参考图片 1</text>
+  <text x="1066" y="329" class="blue">参考图片 2</text>
+  <text x="849" y="381">人物外观</text>
+  <text x="1159" y="381">海边场景</text>
+  <text x="756" y="422" class="small">预览　替换　移除</text>
+  <text x="1066" y="422" class="small">预览　替换　移除</text>
+  <text x="740" y="471" class="label">参考编号用于描述素材；按模型约定解析引用。</text>
+
+  <rect x="64" y="497" width="596" height="46" rx="8" fill="#302b23"/>
+  <text x="80" y="527" class="warn">两张图片已满。更多素材可切换全能参考。</text>
+  <rect x="740" y="497" width="180" height="46" rx="8" class="field"/>
+  <text x="783" y="527" class="blue">＋ 参考图片</text>
+  <rect x="938" y="497" width="180" height="46" rx="8" class="field"/>
+  <text x="981" y="527" class="blue">＋ 参考视频</text>
+  <rect x="1136" y="497" width="200" height="46" rx="8" fill="#20242d" stroke="#343b49"/>
+  <text x="1160" y="527" class="muted">参考音频 · 暂不可用</text>
+  <text x="740" y="567" class="small">提示示例：当前服务尚未确认参考音频支持。</text>
+
+  <text x="64" y="580" class="label">视频描述</text>
+  <rect x="64" y="594" width="596" height="72" rx="8" class="field"/>
+  <text x="80" y="623">人物从站立缓慢坐下，保持外观和场景连贯。</text>
+  <text x="80" y="649" class="small">提示：描述开始到结束之间的动作和镜头变化。</text>
+  <text x="740" y="600" class="label">视频描述</text>
+  <rect x="740" y="614" width="596" height="52" rx="8" class="field"/>
+  <text x="756" y="647">参考图片 1 的人物、图片 2 的场景，缓慢向前行走。</text>
+
+  <text x="64" y="699" class="small">首尾帧 · 2 张图片 · 5 秒 · 720p · 跟随首帧</text>
+  <text x="740" y="699" class="small">全能参考 · 图片 2 · 视频 0 · 音频 0 · 5 秒</text>
+  <rect x="64" y="718" width="596" height="44" rx="9" fill="#3678e8"/>
+  <text x="318" y="747" font-weight="600">生成视频 →</text>
+  <rect x="740" y="718" width="596" height="44" rx="9" fill="#3678e8"/>
+  <text x="994" y="747" font-weight="600">生成视频 →</text>
+
+  <text x="40" y="831" class="heading">切换前说明用途变化，保留素材草稿</text>
+  <text x="40" y="865" class="small">首尾帧 → 全能参考：原图片将作为参考，不再指定起止画面；由用户确认转换。</text>
+  <text x="40" y="897" class="small">全能参考 → 首尾帧：用户选择开始与结束画面；其他素材留在参考草稿，本次不发送。</text>
+  <text x="40" y="929" class="small">错误紧贴对应素材，给出修复入口；收起高级参数后，上传区仍显示当前方式与素材角色。</text>
+  <text x="40" y="974" class="label">交互示意：上传入口与不可用状态用于展示反馈方式，不代表某个模型已经通过网关能力验证。</text>
+</svg>

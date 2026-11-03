@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="960" viewBox="0 0 1400 960" role="img" aria-labelledby="title desc">
+  <title id="title">视频作品分组 下载状态和批量管理</title>
+  <desc id="desc">视频作品列表有分组管理、收藏、生成状态和下载状态筛选。批量工具栏支持本页选择、分组、逐项下载、ZIP、收藏和删除。三张示例卡片展示已下载、未下载和暂无成品，底部下载队列显示失败重试。</desc>
+  <style>
+    text {font-family:"Microsoft YaHei","PingFang SC",sans-serif;font-size:16px;fill:#e7e9ee}
+    .small {font-size:14px;fill:#aeb9cb}
+    .label {font-size:14px;fill:#8e9bb0}
+    .heading {font-size:24px;font-weight:600}
+    .blue {fill:#abd0ff}
+    .green {fill:#9adebc}
+    .warn {fill:#edcb92}
+    .field {fill:#202734;stroke:#3a4557}
+    .card {fill:#191f2a;stroke:#364254}
+  </style>
+  <rect width="1400" height="960" fill="#0e131c"/>
+  <text x="40" y="49" class="heading">视频作品</text>
+  <text x="190" y="49" class="small">与图片工作台一致的历史管理 · 数据与下载标记独立保存</text>
+  <rect x="40" y="78" width="190" height="42" rx="8" class="field"/>
+  <text x="56" y="105">全部分组（38） ▾</text>
+  <text x="254" y="105" class="blue">管理分组</text>
+  <text x="366" y="105" class="small">新视频归入：未分组</text>
+  <text x="1102" y="105" class="small">分组数量仅统计视频</text>
+
+  <rect x="40" y="138" width="116" height="42" rx="8" class="field"/>
+  <text x="54" y="165">☆ 仅收藏</text>
+  <rect x="168" y="138" width="142" height="42" rx="8" class="field"/>
+  <text x="185" y="165">全部状态 ▾</text>
+  <rect x="322" y="138" width="160" height="42" rx="8" class="field"/>
+  <text x="338" y="165">下载状态：全部</text>
+  <rect x="494" y="138" width="140" height="42" rx="8" class="field"/>
+  <text x="510" y="165">全部模型 ▾</text>
+  <rect x="646" y="138" width="550" height="42" rx="8" class="field"/>
+  <text x="662" y="165" class="small">搜索视频描述、模型或参数</text>
+  <rect x="1210" y="138" width="150" height="42" rx="8" fill="#274776"/>
+  <text x="1252" y="165" class="blue">退出批量</text>
+
+  <rect x="40" y="200" width="1320" height="88" rx="12" class="card"/>
+  <text x="58" y="229">已选 3 条 · 可下载 2 个视频</text>
+  <text x="382" y="229" class="small">只操作当前筛选后的本页，不包含其他页</text>
+  <text x="58" y="266" class="blue">移至分组 ▾</text>
+  <text x="202" y="266" class="blue">全选本页</text>
+  <text x="344" y="266" class="green">下载选中</text>
+  <text x="486" y="266" class="green">打包 ZIP</text>
+  <text x="628" y="266" class="warn">收藏</text>
+  <text x="732" y="266" fill="#f5b0b0">删除记录</text>
+  <text x="934" y="266" class="small">下载范围：所有选中成品 ▾</text>
+  <text x="40" y="323" class="small">第 1–15 条，共 38 条 · 每页 15 条</text>
+  <text x="1096" y="323" class="small">上一页　1 / 3　下一页</text>
+
+  <rect x="40" y="345" width="424" height="300" rx="12" class="card"/>
+  <rect x="488" y="345" width="424" height="300" rx="12" class="card"/>
+  <rect x="936" y="345" width="424" height="300" rx="12" class="card"/>
+  <path d="M52 345h400a12 12 0 0 1 12 12v164H40V357a12 12 0 0 1 12-12" fill="#233746"/>
+  <path d="M500 345h400a12 12 0 0 1 12 12v164H488V357a12 12 0 0 1 12-12" fill="#30374a"/>
+  <path d="M948 345h400a12 12 0 0 1 12 12v164H936V357a12 12 0 0 1 12-12" fill="#242e3e"/>
+  <rect x="424" y="360" width="24" height="24" rx="5" fill="#3678e8"/>
+  <path d="m430 372 4 4 8-10" fill="none" stroke="white" stroke-width="2"/>
+  <rect x="872" y="360" width="24" height="24" rx="5" fill="#3678e8"/>
+  <path d="m878 372 4 4 8-10" fill="none" stroke="white" stroke-width="2"/>
+  <rect x="1320" y="360" width="24" height="24" rx="5" fill="#3678e8"/>
+  <path d="m1326 372 4 4 8-10" fill="none" stroke="white" stroke-width="2"/>
+  <text x="58" y="379" class="green">已生成</text>
+  <text x="506" y="379" class="green">已生成</text>
+  <text x="954" y="379" class="blue">生成中</text>
+  <path d="m243 416 24 16-24 16z" fill="#d4dfed"/>
+  <path d="m691 416 24 16-24 16z" fill="#d4dfed"/>
+  <text x="1085" y="437" class="small">等待结果</text>
+  <text x="58" y="555">产品展示 · 缓慢推进</text>
+  <text x="506" y="555">海边行走 · 自然跟拍</text>
+  <text x="954" y="555">雨后城市 · 固定镜头</text>
+  <text x="58" y="584" class="small">Seedance 2.5　720p　5 秒</text>
+  <text x="506" y="584" class="small">MiniMax-H3　768P　5 秒</text>
+  <text x="954" y="584" class="small">Seedance 2.0　720p　5 秒</text>
+  <text x="58" y="621" class="small">产品宣传 ▾</text>
+  <text x="208" y="621" class="green">✓ 已下载</text>
+  <text x="362" y="621" class="blue">下载　☆</text>
+  <text x="506" y="621" class="small">旅行素材 ▾</text>
+  <text x="656" y="621" class="small">↓ 未下载</text>
+  <text x="810" y="621" class="blue">下载　☆</text>
+  <text x="954" y="621" class="small">未分组 ▾</text>
+  <text x="1104" y="621" class="label">暂无成品</text>
+  <text x="1264" y="621" class="blue">详情　☆</text>
+
+  <text x="40" y="681" class="small">已下载仅表示本页面已发起文件保存；播放、打开链接或导出历史 JSON 不会修改下载标记。</text>
+  <rect x="40" y="707" width="1320" height="180" rx="12" class="card"/>
+  <text x="60" y="742" font-size="19" font-weight="600">批量下载队列</text>
+  <text x="278" y="742" class="small">已处理 2 / 2 · 1 条已发起保存 · 1 条失败 · 1 条暂无成品已跳过</text>
+  <text x="60" y="784" class="green">产品展示　已发起保存</text>
+  <text x="60" y="820" class="warn">海边行走　文件读取失败，可刷新链接后重试</text>
+  <text x="60" y="861" class="small">ZIP 部分失败时先列明文件，用户选择重试或仅打包已获取文件；不会统一标记全部已下载。</text>
+  <rect x="1150" y="766" width="186" height="42" rx="8" fill="#274776"/>
+  <text x="1187" y="794" class="blue">重试失败项</text>
+  <text x="40" y="931" class="label">设计示意：分组与收藏、下载标记、批量选择和操作均为首版能力。工具栏独立占位，不遮挡视频。</text>
+</svg>
