@@ -29,8 +29,21 @@ export default defineConfig(({ command }) => {
     },
     server: {
       host: true,
-      proxy:
-        devProxyConfig?.enabled
+      proxy: {
+        ...(process.env.VIDEO_API_PROXY_URL ? {
+          '/video-api-proxy': {
+            target: process.env.VIDEO_API_PROXY_URL,
+            changeOrigin: true,
+            rewrite: (path: string) => path.replace(/^\/video-api-proxy/, ''),
+            configure: (proxy: any) => proxy.on('proxyReq', (proxyReq: any, req: any, res: any) => {
+              const path = (req.url ?? '').split('?')[0]
+              if (!(req.method === 'POST' && /^(\/doubao\/api\/v3\/contents\/generations\/tasks|\/hailuo\/v[12]\/video_generation)$/.test(path) || req.method === 'GET' && /^(\/doubao\/api\/v3\/contents\/generations\/tasks|\/hailuo\/v[12]\/query\/video_generation)\/[^/]+$/.test(path))) {
+                proxyReq.destroy(); res.writeHead(403); res.end('Video proxy path restricted')
+              }
+            }),
+          },
+        } : {}),
+        ...(devProxyConfig?.enabled
           ? {
               [devProxyConfig.prefix]: {
                 target: devProxyConfig.target,
@@ -43,7 +56,8 @@ export default defineConfig(({ command }) => {
                   ),
               },
             }
-          : undefined,
+          : {}),
+      },
     },
   }
 })
