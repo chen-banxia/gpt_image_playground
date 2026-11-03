@@ -4,6 +4,7 @@ import { useT } from '../hooks/useI18n'
 import TaskCard from './TaskCard'
 import { useGalleryPage } from '../hooks/useGalleryPage'
 import GalleryPagination from './GalleryPagination'
+import { useImageDownloads } from '../lib/imageBatchDownloads'
 
 export default function TaskGrid() {
   const t = useT()
@@ -45,6 +46,11 @@ export default function TaskGrid() {
   }, [filteredTasks, setSelectedTaskIds])
 
   const handleDelete = (task: typeof tasks[0]) => {
+    const downloads = useImageDownloads.getState()
+    if (downloads.busy && downloads.taskIds.includes(task.id)) {
+      useStore.getState().showToast(t('这些记录正在下载，请先等待或取消下载队列。'), 'info')
+      return
+    }
     setConfirmDialog({
       title: t('deleteRecord'),
       message: t('deleteRecordMessage'),
@@ -171,8 +177,10 @@ export default function TaskGrid() {
 
   if (!filteredTasks.length) {
     return (
+      <>
+      <GalleryPagination {...pagination} onPageChange={setGalleryPage} />
       <div className="text-center py-20 text-gray-400 dark:text-gray-500">
-        {searchQuery || filterFavorite || groupFilter !== 'all' || filterStatus !== 'all' ? (
+        {tasks.length > 0 ? (
           <p className="text-sm">{t('noMatches')}</p>
         ) : (
           <>
@@ -193,6 +201,7 @@ export default function TaskGrid() {
           </>
         )}
       </div>
+      </>
     )
   }
 
@@ -202,7 +211,7 @@ export default function TaskGrid() {
       data-task-grid-root
       className="relative min-h-[50vh]"
     >
-      <GalleryPagination {...pagination} />
+      <GalleryPagination {...pagination} onPageChange={setGalleryPage} />
       {/* 按可用宽度自动调整列数，侧栏展开后仍保持卡片可读；标记用于侧栏顶部对齐。 */}
       <div ref={gridRef} data-gallery-items className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,320px),1fr))] gap-4 pb-10">
         {filteredTasks.map((task) => (

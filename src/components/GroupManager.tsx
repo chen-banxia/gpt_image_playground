@@ -2,10 +2,13 @@ import { useState } from 'react'
 import { deleteImageGroup, saveImageGroup, useStore } from '../store'
 import { useT } from '../hooks/useI18n'
 import { useCloseOnEscape } from '../hooks/useCloseOnEscape'
+import { updateVideoTasks, useVideoStore } from '../features/video/store'
 
 export default function GroupManager({ onClose }: { onClose: () => void }) {
   const t = useT()
   const groups = useStore((state) => state.groups)
+  const imageTasks = useStore((state) => state.tasks)
+  const videoTasks = useVideoStore((state) => state.tasks)
   const [name, setName] = useState('')
   const [editing, setEditing] = useState<string | undefined>()
   const [error, setError] = useState('')
@@ -28,9 +31,9 @@ export default function GroupManager({ onClose }: { onClose: () => void }) {
           <span className="min-w-0 flex-1 truncate">{group.name}</span>
           <button className="text-xs text-blue-500" onClick={() => { setEditing(group.id); setName(group.name) }}>{t('renameGroup')}</button>
           <button className="text-xs text-red-500" onClick={() => useStore.getState().setConfirmDialog({
-            title: t('deleteGroup'), message: t('deleteGroupHint', { name: group.name }),
+            title: t('deleteGroup'), message: t("删除「{0}」分组？{1} 条图片和 {2} 条视频记录将归入未分组，作品不会删除。", { "0": group.name, "1": imageTasks.filter(t => t.groupId === group.id).length, "2": videoTasks.filter(t => t.groupId === group.id).length }),
             action: async () => {
-              try { await deleteImageGroup(group.id); if (editing === group.id) { setEditing(undefined); setName('') } }
+              try { await deleteImageGroup(group.id); await updateVideoTasks(videoTasks.filter(t => t.groupId === group.id).map(t => t.id), { groupId: null }); if (editing === group.id) { setEditing(undefined); setName('') } }
               catch (err) { setError(err instanceof Error ? err.message : String(err)) }
             },
           })}>{t('deleteGroup')}</button>

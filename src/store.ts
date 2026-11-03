@@ -124,6 +124,10 @@ interface AppState {
   setFilterStatus: (status: AppState['filterStatus']) => void
   filterFavorite: boolean
   setFilterFavorite: (f: boolean) => void
+  filterModel: string
+  filterDownload: string
+  setFilterModel: (model: string) => void
+  setFilterDownload: (state: string) => void
 
   // 多选
   /** 按图片 ID 记录页面发起下载的时间，同一图片在不同记录中共享标记。 */
@@ -321,6 +325,10 @@ export const useStore = create<AppState>()(
       setFilterStatus: (filterStatus) => set({ filterStatus, galleryPage: 1, selectedTaskIds: [] }),
       filterFavorite: false,
       setFilterFavorite: (filterFavorite) => set({ filterFavorite, galleryPage: 1, selectedTaskIds: [] }),
+      filterModel: 'all',
+      filterDownload: 'all',
+      setFilterModel: (filterModel) => set({ filterModel, galleryPage: 1, selectedTaskIds: [] }),
+      setFilterDownload: (filterDownload) => set({ filterDownload, galleryPage: 1, selectedTaskIds: [] }),
 
       // Selection
       downloadedImages: {},
@@ -1203,7 +1211,18 @@ export async function removeTask(task: TaskRecord) {
   showToast(tr('recordDeletedToast'), 'success')
 }
 
-/** 清空所有数据（含配置重置） */
+/** 图片工作台清理与视频、公共分组、凭证隔离。 */
+export async function clearImageWorkspaceData() {
+  await dbClearTasks()
+  await clearImages()
+  imageCache.clear()
+  useStore.setState({ tasks: [], downloadedImages: {}, selectedTaskIds: [], galleryPage: 1 })
+  useStore.getState().clearInputImages()
+  useStore.getState().clearMaskDraft()
+  useStore.getState().showToast(tr('图片数据已清空，视频、分组和配置已保留'), 'success')
+}
+
+/** 仅供明确的全应用重置调用，工作台清理不得复用此函数。 */
 export async function clearAllData() {
   await dbClearTasks()
   await clearImages()

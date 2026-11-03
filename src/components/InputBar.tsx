@@ -1,3 +1,4 @@
+import CreationPanelHeader from './workspace/CreationPanelHeader'
 import { useRef, useEffect, useLayoutEffect, useCallback, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { useStore, submitTask, addImageFromFile } from '../store'
@@ -1138,25 +1139,7 @@ export default function InputBar({ collapsed, onToggle }: InputBarProps) {
 
       <aside data-input-bar aria-label={t('generationPanel')} className="generation-sidebar">
         <div className="generation-panel bg-white/90 dark:bg-gray-900/90 border border-gray-200/80 dark:border-white/[0.08] shadow-lg rounded-2xl">
-          <div className={'flex shrink-0 items-center gap-2 ' + (collapsed ? 'justify-center p-2' : 'justify-between p-4')}>
-            {!collapsed && <h2 className="text-sm font-semibold">{t('generationPanel')}</h2>}
-            <button
-              type="button"
-              onClick={onToggle}
-              aria-expanded={!collapsed}
-              aria-controls="generation-panel-content"
-              aria-label={t(collapsed ? 'expandGenerationPanel' : 'collapseGenerationPanel')}
-              title={t(collapsed ? 'expandGenerationPanel' : 'collapseGenerationPanel')}
-              className="flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl px-2.5 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-white/[0.06] focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
-            >
-              <svg aria-hidden="true" className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <rect x="3" y="4" width="18" height="16" rx="2" strokeWidth={1.5} />
-                <path d="M9 4v16" strokeWidth={1.5} />
-                <path d={collapsed ? 'm13 9 3 3-3 3' : 'm16 9-3 3 3 3'} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-              <span className={collapsed ? 'text-xs md:hidden' : 'text-xs'}>{t(collapsed ? 'expandGenerationPanel' : 'collapseGenerationPanel')}</span>
-            </button>
-          </div>
+          <CreationPanelHeader title={t('workspaceImageCreation')} collapsed={collapsed} controls="generation-panel-content" onToggle={onToggle} />
           {/* 仅隐藏内容而不卸载，保留输入草稿、参数编辑状态和参考图。 */}
           <div id="generation-panel-content" className="generation-panel-body" hidden={collapsed}>
             {inputImages.length > 0 && renderImageThumbs()}

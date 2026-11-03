@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useStore } from '../store'
 import { useVersionCheck } from '../hooks/useVersionCheck'
 import { useLanguage, useT } from '../hooks/useI18n'
@@ -11,10 +11,16 @@ export default function Header() {
   const setShowSettings = useStore((s) => s.setShowSettings)
   const { hasUpdate, latestRelease, dismiss } = useVersionCheck()
   const [showHelp, setShowHelp] = useState(false)
+  const [videoActive, setVideoActive] = useState(window.location.hash === '#/video')
+  useEffect(() => {
+    const update = () => setVideoActive(window.location.hash === '#/video')
+    window.addEventListener('hashchange', update)
+    return () => window.removeEventListener('hashchange', update)
+  }, [])
 
   return (
     <header data-no-drag-select className="safe-area-top sticky top-0 z-40 bg-white/80 dark:bg-gray-950/80 backdrop-blur border-b border-gray-200 dark:border-white/[0.08]">
-      <div className="safe-area-x safe-header-inner max-w-7xl mx-auto flex items-center justify-between">
+      <div className="safe-area-x safe-header-inner max-w-7xl mx-auto grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 py-1.5 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
         <div className="flex min-w-0 items-center gap-2">
           <div className="flex flex-shrink-0 items-start gap-1">
             <h1 className="text-lg font-bold tracking-tight">
@@ -91,7 +97,20 @@ export default function Header() {
             {t('modelRelayMobile')}
           </a>*/}
         </div>
-        <div className="flex items-center gap-1">
+        {/* 主导航独立居中；窄屏占满第二行，完整名称和触控区域始终可见。 */}
+        <nav aria-label={language === 'en' ? 'Creative workspaces' : '创作工作台'} className="col-span-2 row-start-2 grid grid-cols-2 gap-1 rounded-2xl border border-blue-200/80 bg-blue-50/80 p-1 dark:border-blue-400/20 dark:bg-blue-500/[0.08] md:col-span-1 md:col-start-2 md:row-start-1">
+          {[{ video: false, href: '#/image', label: language === 'en' ? 'Image studio' : '图片工作台' }, { video: true, href: '#/video', label: language === 'en' ? 'Video studio' : '视频工作台' }].map(item => {
+            const active = videoActive === item.video
+            return <a key={item.href} href={item.href} aria-current={active ? 'page' : undefined}
+              className={`flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-xl px-4 text-sm font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 lg:px-6 ${active ? 'bg-blue-600 text-white shadow-sm shadow-blue-600/25 dark:bg-blue-500' : 'text-slate-600 hover:bg-blue-100 hover:text-blue-700 dark:text-slate-300 dark:hover:bg-blue-400/15 dark:hover:text-white'}`}>
+              <svg aria-hidden="true" className="h-5 w-5 shrink-0" fill="none" stroke="currentColor" strokeWidth={1.7} viewBox="0 0 24 24">
+                {item.video ? <><rect x="3" y="5" width="18" height="14" rx="3" /><path d="m10 9 5 3-5 3Z" strokeLinejoin="round" /></> : <><rect x="3" y="3" width="18" height="18" rx="3" /><circle cx="8" cy="8" r="1.5" /><path d="m3 17 6-6 4 4 3-3 5 5" strokeLinejoin="round" /></>}
+              </svg>
+              {item.label}
+            </a>
+          })}
+        </nav>
+        <div className="col-start-2 row-start-1 flex items-center justify-end gap-1 md:col-start-3">
           <button
             type="button"
             onClick={() => setSettings({ language: language === 'en' ? 'zh' : 'en' })}

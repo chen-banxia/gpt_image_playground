@@ -5,6 +5,7 @@ import { useLanguage, useT } from '../hooks/useI18n'
 import GenerationPreview from './GenerationPreview'
 import DownloadBadge from './DownloadBadge'
 import GroupPicker from './GroupPicker'
+import ImageToVideoButton from '../features/video/ImageToVideoButton'
 import { downloadImage } from '../lib/downloadImage'
 import { formatImageRatio, parseOutputSize } from '../lib/size'
 import { ActualValueBadge, DetailParamValue } from '../lib/paramDisplay'
@@ -301,6 +302,7 @@ export default function DetailModal() {
         </div>
 
         {/* 左侧：图片 */}
+        {task.status === 'done' && <div className="absolute bottom-3 left-3 z-20 rounded-xl bg-white/90 dark:bg-gray-900/90"><ImageToVideoButton imageId={task.outputImages[imageIndex]} groupId={task.groupId} /></div>}
         <div ref={imagePanelRef} className="md:w-1/2 w-full h-64 md:h-auto transparency-grid bg-gray-100 dark:bg-black/20 relative flex items-center justify-center flex-shrink-0 min-h-[16rem]">
           {task.status === 'done' && outputLen > 0 && currentOutputImageSrc && (
             <>

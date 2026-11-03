@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { useStore, exportData, importData, clearAllData } from '../store'
+import { useStore, exportData, importData, clearImageWorkspaceData } from '../store'
+import VideoSettings from '../features/video/VideoSettings'
+import { useImageDownloads } from '../lib/imageBatchDownloads'
 import { getActiveApiProfile, normalizeSettings, DEFAULT_API_TIMEOUT, MAX_API_TIMEOUT } from '../lib/apiProfiles'
 import type { AppSettings } from '../types'
 import { useCloseOnEscape } from '../hooks/useCloseOnEscape'
@@ -7,6 +9,7 @@ import { useT } from '../hooks/useI18n'
 
 export default function SettingsModal() {
   const t = useT()
+  const imageDownloading = useImageDownloads(s => s.busy)
   const showSettings = useStore((s) => s.showSettings)
   const setShowSettings = useStore((s) => s.setShowSettings)
   const settings = useStore((s) => s.settings)
@@ -90,7 +93,7 @@ export default function SettingsModal() {
   }
 
   const handleClearAllData = async () => {
-    await clearAllData()
+    await clearImageWorkspaceData()
     setDraft(normalizeSettings(useStore.getState().settings))
   }
 
@@ -165,7 +168,7 @@ export default function SettingsModal() {
 
             <div className="space-y-4">
               <div className="block">
-                <span className="block text-xs text-gray-500 dark:text-gray-400 mb-1">API Key</span>
+                <span className="block text-xs text-gray-500 dark:text-gray-400 mb-1">{t("生图 API Key")}</span>
                 <div className="relative">
                   <input
                     value={activeProfile.apiKey}
@@ -244,12 +247,13 @@ export default function SettingsModal() {
             </div>
           </section>
 
+          <VideoSettings />
           <section className="pt-6 border-t border-gray-100 dark:border-white/[0.08]">
             <h4 className="mb-4 text-sm font-medium text-gray-800 dark:text-gray-200 flex items-center gap-1.5">
               <svg className="w-4 h-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
               </svg>
-              {t('dataManagement')}
+              {t("图片数据管理")}
             </h4>
             <div className="space-y-3">
               <div className="flex gap-2">
@@ -280,16 +284,18 @@ export default function SettingsModal() {
                 />
               </div>
               <button
+                disabled={imageDownloading}
+                title={imageDownloading ? t('这些记录正在下载，请先等待或取消下载队列。') : undefined}
                 onClick={() =>
                   setConfirmDialog({
-                    title: t('clearAllDataTitle'),
-                    message: t('clearAllDataMessage'),
+                    title: t("清空图片历史与素材"),
+                    message: t("清空图片历史、图片输入和本地图片文件？视频历史、已复制的视频输入、公共分组和接口配置都会保留。"),
                     action: () => handleClearAllData(),
                   })
                 }
                 className="w-full rounded-xl border border-red-200/80 bg-red-50/50 px-4 py-2.5 text-sm text-red-500 transition hover:bg-red-100/80 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-400 dark:hover:bg-red-500/20"
               >
-                {t('clearAllData')}
+                {t("清空图片历史与素材")}
               </button>
             </div>
           </section>

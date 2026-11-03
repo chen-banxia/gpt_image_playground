@@ -16,6 +16,6 @@ export function filterGalleryTasks(tasks: TaskRecord[], groups: ImageGroup[], gr
     if (groupFilter !== ALL_GROUPS && (groupFilter === UNGROUPED ? groupId !== null : groupId !== groupFilter)) return false
     if (favorite && !task.isFavorite) return false
     if (status !== 'all' && task.status !== status) return false
-    return !q || task.prompt.toLowerCase().includes(q) || JSON.stringify(task.params).toLowerCase().includes(q)
+    return !q || task.prompt.toLowerCase().includes(q) || JSON.stringify(task.params).toLowerCase().includes(q) || `${task.apiModel ?? ''} ${task.apiImageModel ?? ''}`.toLowerCase().includes(q)
   }).sort((a, b) => b.createdAt - a.createdAt)
 }

@@ -1,9 +1,9 @@
-import { useCallback, useState } from 'react'
-import { useStore, updateTaskInStore, removeMultipleTasks, ensureImageCached } from '../store'
-import { buildSelectedImagesZip, saveImagesZip } from '../lib/batchDownload'
+import { useCallback } from 'react'
+import { useStore, updateTaskInStore, removeMultipleTasks, assignTaskGroup } from '../store'
+import { downloadImageBatch, selectedImageFiles, useImageDownloads } from '../lib/imageBatchDownloads'
 import { useT } from '../hooks/useI18n'
 import { useGalleryPage } from '../hooks/useGalleryPage'
-import GroupPicker from './GroupPicker'
+import WorkspaceBatchToolbar from './workspace/WorkspaceBatchToolbar'
 
 /** 批量操作独立于画图面板，收起面板后仍可管理当前页的记录。 */
 export default function BatchActions() {
@@ -13,7 +13,8 @@ export default function BatchActions() {
   const selectedTaskIds = useStore((s) => s.selectedTaskIds)
   const batchMode = useStore((s) => s.batchMode)
   const setBatchMode = useStore((s) => s.setBatchMode)
-  const [downloading, setDownloading] = useState(false)
+  const downloading = useImageDownloads(s => s.busy)
+  const groups = useStore(s => s.groups)
   const setSelectedTaskIds = useStore((s) => s.setSelectedTaskIds)
   const clearSelection = useStore((s) => s.clearSelection)
 
@@ -22,20 +23,7 @@ export default function BatchActions() {
   const allVisibleSelected = filteredTasks.length > 0 && filteredTasks.every((task) => selectedTaskIds.includes(task.id))
   // 即使选择清理的 effect 尚未执行，也只允许操作当前页仍可见的记录。
   const selectedTasks = filteredTasks.filter((task) => selectedTaskIds.includes(task.id))
-  const imageCount = selectedTasks.reduce((count, task) => count + task.outputImages.length, 0)
-
-  const handleDownloadSelected = async () => {
-    if (downloading || !imageCount) return
-    setDownloading(true)
-    try {
-      const result = await buildSelectedImagesZip(selectedTasks, ensureImageCached)
-      saveImagesZip(result.bytes)
-      useStore.getState().markImagesDownloaded(result.imageIds)
-      showToast(t('batchDownloadDone', { count: result.count, skipped: result.skipped }), 'success')
-    } catch (error) {
-      showToast(error instanceof Error ? error.message : t('downloadFailed'), 'error')
-    } finally { setDownloading(false) }
-  }
+  const imageCount = selectedImageFiles(selectedTasks, false, {}).length
 
   const handleSelectAllToggle = useCallback(() => {
     if (allVisibleSelected) {
@@ -49,20 +37,10 @@ export default function BatchActions() {
   const handleToggleFavorite = useCallback(() => {
     const allFavorite = selectedTasks.length > 0 && selectedTasks.every((t) => t.isFavorite)
     const newFavoriteState = !allFavorite
-    setConfirmDialog({
-      title: newFavoriteState ? t('batchFavorite') : t('batchUnfavorite'),
-      message: newFavoriteState
-        ? t('batchFavoriteMessage', { count: selectedTasks.length })
-        : t('batchUnfavoriteMessage', { count: selectedTasks.length }),
-      confirmText: newFavoriteState ? t('confirmFavorite') : t('confirmUnfavorite'),
-      action: () => {
-        selectedTasks.forEach((task) => {
-          updateTaskInStore(task.id, { isFavorite: newFavoriteState })
-        })
-        clearSelection()
-      },
+    selectedTasks.forEach((task) => {
+      updateTaskInStore(task.id, { isFavorite: newFavoriteState })
     })
-  }, [selectedTasks, clearSelection, setConfirmDialog, t])
+  }, [selectedTasks])
 
   const handleDeleteSelected = useCallback(() => {
     if (!selectedTasks.length) return
@@ -78,25 +56,12 @@ export default function BatchActions() {
 
   if (!batchMode && selectedTaskIds.length === 0) return null
 
-  return (
-    <div data-no-drag-select className="mb-3 flex justify-center">
-      <div className="flex max-w-full flex-wrap items-center justify-center gap-1 rounded-2xl border border-white/10 bg-gray-800/95 p-2 text-xs text-white shadow-lg backdrop-blur" role="toolbar" aria-label={t('batchActions')}>
-        <span className="px-2" aria-live="polite">{t('batchSelected', { count: selectedTasks.length, images: imageCount })}</span>
-        <GroupPicker taskIds={selectedTasks.map((task) => task.id)} batch />
-        <button type="button" onClick={handleSelectAllToggle} className="rounded-lg px-2 py-2 text-blue-300 hover:bg-white/10">
-          {t(allVisibleSelected ? 'cancelSelectAll' : 'selectCurrentPage')}
-        </button>
-        <button type="button" onClick={handleDownloadSelected} disabled={downloading || imageCount === 0}
-          className="rounded-lg px-2 py-2 text-green-300 hover:bg-white/10 disabled:opacity-40">
-          {t(downloading ? 'batchDownloading' : 'batchDownload')}
-        </button>
-        <button type="button" onClick={handleToggleFavorite} disabled={!selectedTasks.length}
-          className="rounded-lg px-2 py-2 text-yellow-300 hover:bg-white/10 disabled:opacity-40">{t('favoriteOrUnfavorite')}</button>
-        <button type="button" onClick={handleDeleteSelected} disabled={!selectedTasks.length || downloading}
-          className="rounded-lg px-2 py-2 text-red-300 hover:bg-white/10 disabled:opacity-40">{t('batchDelete')}</button>
-        <button type="button" onClick={() => { clearSelection(); setBatchMode(false) }}
-          className="rounded-lg px-2 py-2 text-gray-300 hover:bg-white/10">{t('exitBatch')}</button>
-      </div>
-    </div>
-  )
+  return <WorkspaceBatchToolbar
+    count={selectedTasks.length} files={imageCount} pageCount={filteredTasks.length}
+    allSelected={allVisibleSelected} allFavorite={selectedTasks.length > 0 && selectedTasks.every(t => t.isFavorite)}
+    busy={downloading} groups={groups} onSelectAll={handleSelectAllToggle}
+    onMove={groupId => { void assignTaskGroup(selectedTasks.map(t => t.id), groupId).catch(error => showToast(error instanceof Error ? error.message : String(error), 'error')) }}
+    onFavorite={handleToggleFavorite} onDelete={handleDeleteSelected}
+    onDownload={(mode, onlyUndownloaded) => { void downloadImageBatch(selectedTasks, mode, onlyUndownloaded) }}
+    onExit={() => { clearSelection(); setBatchMode(false) }} />
 }

@@ -18,8 +18,19 @@ import ConfirmDialog from './components/ConfirmDialog'
 import Toast from './components/Toast'
 import MaskEditorModal from './components/MaskEditorModal'
 import ImageContextMenu from './components/ImageContextMenu'
+import VideoWorkspace, { VideoDownloadPanel } from './features/video/VideoWorkspace'
+import { initializeVideo } from './features/video/store'
+import ImageDownloadPanel from './components/workspace/ImageDownloadPanel'
 
 export default function App() {
+  const [workspace, setWorkspace] = useState(window.location.hash === '#/video' ? 'video' : 'image')
+  useEffect(() => {
+    const update = () => setWorkspace(window.location.hash === '#/video' ? 'video' : 'image')
+    window.addEventListener('hashchange', update)
+    void initializeVideo()
+    return () => window.removeEventListener('hashchange', update)
+  }, [])
+  useEffect(() => { useStore.getState().setBatchMode(false) }, [workspace])
   // 每次进入首页默认展开；收起状态只控制布局，不清空已填写的生成参数。
   const [inputCollapsed, setInputCollapsed] = useState(false)
   const layoutRef = useRef<HTMLDivElement>(null)
@@ -34,17 +45,17 @@ export default function App() {
     if (!layout || !gallery) return
 
     const alignInputPanel = () => {
-      const items = gallery.querySelector<HTMLElement>('[data-gallery-items]')
+      const items = gallery.querySelector<HTMLElement>('[data-workspace-toolbar]')
       if (!window.matchMedia('(min-width: 768px)').matches || !items) {
         layout.style.removeProperty('--input-panel-top')
         return
       }
-      // 使用文档坐标对齐第一排图片，避免页面滚动时固定面板跟着上移。
+      // 对齐顶部操作栏，充分利用可用高度；页面滚动时仍保持固定。
       layout.style.setProperty('--input-panel-top', `${items.getBoundingClientRect().top + window.scrollY}px`)
     }
 
     alignInputPanel()
-    // 筛选栏换行、批量操作栏出现或面板收起时，重新计算图片区域的起点。
+    // 语言切换和窗口变化时，重新测量操作栏位置。
     const observer = new ResizeObserver(alignInputPanel)
     observer.observe(gallery)
     window.addEventListener('resize', alignInputPanel)
@@ -52,7 +63,7 @@ export default function App() {
       observer.disconnect()
       window.removeEventListener('resize', alignInputPanel)
     }
-  }, [])
+  }, [workspace])
 
   useEffect(() => {
     setActiveLanguage(language)
@@ -142,7 +153,7 @@ export default function App() {
   return (
     <>
       <Header />
-      <div ref={layoutRef} className="generation-layout" data-input-collapsed={inputCollapsed}>
+      {workspace === 'video' ? <VideoWorkspace /> : <div ref={layoutRef} className="generation-layout" data-input-collapsed={inputCollapsed}>
         <InputBar collapsed={inputCollapsed} onToggle={() => setInputCollapsed((value) => !value)} />
         <main data-home-main data-drag-select-surface className="generation-gallery min-w-0 pb-6">
           <div ref={galleryRef} className="safe-area-x max-w-7xl mx-auto">
@@ -151,7 +162,7 @@ export default function App() {
             <TaskGrid />
           </div>
         </main>
-      </div>
+      </div>}
       <DetailModal />
       <Lightbox />
       <SettingsModal />
@@ -159,6 +170,8 @@ export default function App() {
       <Toast />
       <MaskEditorModal />
       <ImageContextMenu />
+      <VideoDownloadPanel />
+      <ImageDownloadPanel />
     </>
   )
 }
