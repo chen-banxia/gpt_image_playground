@@ -4,11 +4,13 @@ import { Zip, ZipPassThrough } from 'fflate'
 import type { VideoTask } from './types'
 import { safeMediaUrl } from './api'
 import { message, syncVideoTask, updateVideoTasks, useVideoStore } from './store'
+import { videoDownloadProxyPath } from '../../lib/videoDownloadProxy'
 
 // 内存模式明确限制总量；未知 Content-Length 同样按实际读取字节计数。
 export const MAX_DOWNLOAD_BYTES = 256 * 1024 * 1024
 export class MediaLimitError extends Error {}
-type Entry = { id: string; prompt: string; state: 'waiting' | 'fetching' | 'saved' | 'failed' | 'cancelled'; error?: string }
+export class MediaAccessError extends Error {}
+type Entry = { id: string; prompt: string; state: 'waiting' | 'fetching' | 'saved' | 'failed' | 'cancelled'; error?: string; originalUrl?: string }
 interface DownloadState { busy: boolean; mode: 'files' | 'zip'; entries: Entry[]; bytes: number; notice: string }
 export const useVideoDownloads = create<DownloadState>(() => ({ busy: false, mode: 'files', entries: [], bytes: 0, notice: '' }))
 let controller: AbortController | undefined
@@ -23,7 +25,25 @@ export function saveBlob(blob: Blob, filename: string) {
 export async function readMedia(url: string, signal: AbortSignal, limit: number, onBytes: (n: number) => void): Promise<{ bytes: Uint8Array; type: string }> {
   if (!safeMediaUrl(url)) throw new Error(t("结果链接无效"))
   // 结果地址属于独立资源链路，绝不携带 New API Authorization。
-  const response = await fetch(url, { signal, credentials: 'omit' })
+  let response: Response
+  try {
+    response = await fetch(url, { signal, credentials: 'omit', referrerPolicy: 'no-referrer' })
+  } catch (error) {
+    if (signal.aborted) throw error
+    // 浏览器不会向脚本细分 CORS 与网络错误；仅对白名单 CDN 尝试本站文件代理。
+    const proxyPath = videoDownloadProxyPath(url)
+    if (!proxyPath) throw new MediaAccessError(t('浏览器无法读取视频文件，可能受到跨域或网络限制。可打开原视频另存为。'))
+    try { response = await fetch(proxyPath, { signal, credentials: 'omit', referrerPolicy: 'no-referrer', redirect: 'error' }) }
+    catch (proxyError) {
+      if (signal.aborted) throw proxyError
+      throw new MediaAccessError(t('文件下载代理不可用，请更新本站部署后重试，或打开原视频另存为。'))
+    }
+    // 静态托管可能把未部署的代理路径回退到 index.html，不能当成视频下载。
+    if (response.headers.get('X-Video-Download-Proxy') !== '1') {
+      await response.body?.cancel().catch(() => {})
+      throw new MediaAccessError(t('文件下载代理尚未部署。请更新本站服务，或打开原视频后使用浏览器另存为；ZIP 需要服务器允许跨域读取或下载代理。'))
+    }
+  }
   if (!response.ok) throw new Error(t("无法获取视频 ({0})，请刷新结果链接", { "0": response.status }))
   const type = response.headers.get('Content-Type')?.split(';')[0] ?? ''
   if (type && !type.startsWith('video/') && !['application/octet-stream', 'binary/octet-stream'].includes(type)) throw new Error(t("下载地址未返回视频文件"))
@@ -75,7 +95,8 @@ export async function downloadVideos(tasks: VideoTask[], mode: 'files' | 'zip', 
         let result
         try { result = await readMedia(task.videoUrl!, signal, mode === 'zip' ? MAX_DOWNLOAD_BYTES - total : MAX_DOWNLOAD_BYTES, n => useVideoDownloads.setState(s => ({ bytes: s.bytes + n }))) }
         catch (e) {
-          if (signal.aborted || e instanceof MediaLimitError) throw e
+          // 跨域读取失败不靠刷新任务解决，直接保留原链接入口，避免重复无效请求。
+          if (signal.aborted || e instanceof MediaLimitError || e instanceof MediaAccessError) throw e
           await syncVideoTask(task.id, true)
           task = useVideoStore.getState().tasks.find(t => t.id === original.id) ?? task
           result = await readMedia(task.videoUrl!, signal, mode === 'zip' ? MAX_DOWNLOAD_BYTES - total : MAX_DOWNLOAD_BYTES, n => useVideoDownloads.setState(s => ({ bytes: s.bytes + n })))
@@ -94,7 +115,11 @@ export async function downloadVideos(tasks: VideoTask[], mode: 'files' | 'zip', 
           await updateVideoTasks([task.id], { downloadedAt: Date.now(), downloadSource: selected.length > 1 ? 'batch' : 'single' })
           patchEntry(task.id, { state: 'saved', error: undefined })
         }
-      } catch (e) { patchEntry(original.id, { state: signal.aborted ? 'cancelled' : 'failed', error: message(e) }) }
+      } catch (e) {
+        // 另存为入口不代表已保存文件，只有受控下载成功的分支才更新下载标记。
+        const current = useVideoStore.getState().tasks.find(task => task.id === original.id) ?? original
+        patchEntry(original.id, { state: signal.aborted ? 'cancelled' : 'failed', error: message(e), originalUrl: signal.aborted ? undefined : safeMediaUrl(current.videoUrl) })
+      }
     }
     if (zip && !signal.aborted) {
       const failed = useVideoDownloads.getState().entries.filter(e => e.state === 'failed').length

@@ -1,5 +1,10 @@
 /** 视频文案使用原中文作稳定键，统一接入应用语言设置；插值不翻译用户内容。 */
 export const videoEn = {
+  "浏览器无法读取视频文件，可能受到跨域或网络限制。可打开原视频另存为。": "The browser cannot read the video due to CORS or a network issue. Open the original video and save it using your browser.",
+  "文件下载代理不可用，请更新本站部署后重试，或打开原视频另存为。": "The file download proxy is unavailable. Update this site's deployment and retry, or open the original video to save it.",
+  "文件下载代理尚未部署。请更新本站服务，或打开原视频后使用浏览器另存为；ZIP 需要服务器允许跨域读取或下载代理。": "The file download proxy is not deployed. Update this site or open the original video and use Save As. ZIP downloads require CORS access or a file proxy.",
+  "打开原视频另存为": "Open original to save",
+  "若打开后直接播放，请使用播放器下载菜单或右键另存为；外部保存不会自动标记已下载。": "If the video opens in a player, use its download menu or Save As. External saves do not automatically update the download badge.",
   "保存成功": "Settings saved",
   "保存失败": "Could not save settings",
   "操作成功": "Operation completed",

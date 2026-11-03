@@ -19,6 +19,40 @@ beforeEach(async () => {
 })
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals() })
 describe('video file download semantics', () => {
+  it('falls back to the allowlisted same-origin file proxy on a CORS/network error', async () => {
+    const url = 'https://ark-acg-cn-beijing.tos-cn-beijing.volces.com/doubao-seedance-2-0/result.mp4?X-Tos-Signature=abc%2Fdef&X-Tos-Date=20261103'
+    const fetch = vi.spyOn(globalThis, 'fetch')
+      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+      .mockResolvedValueOnce(new Response(new Uint8Array([1, 2, 3]), { headers: { 'Content-Type': 'video/mp4', 'X-Video-Download-Proxy': '1' } }))
+    expect((await readMedia(url, new AbortController().signal, 10, () => {})).bytes).toHaveLength(3)
+    expect(fetch.mock.calls[1][0]).toBe('/video-download-proxy/ark-acg-cn-beijing.tos-cn-beijing.volces.com/doubao-seedance-2-0/result.mp4?X-Tos-Signature=abc%2Fdef&X-Tos-Date=20261103')
+    expect(fetch.mock.calls[1][1]).toMatchObject({ credentials: 'omit', redirect: 'error', referrerPolicy: 'no-referrer' })
+    expect(fetch.mock.calls[1][1]?.headers).toBeUndefined()
+  })
+  it('does not accept a static-hosting HTML fallback as a deployed file proxy', async () => {
+    vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(new TypeError('Failed to fetch')).mockResolvedValueOnce(new Response('<html>App</html>', { headers: { 'Content-Type': 'text/html' } }))
+    await expect(readMedia('https://ark-acg-cn-beijing.tos-cn-beijing.volces.com/result.mp4', new AbortController().signal, 100, () => {})).rejects.toThrow('尚未部署')
+  })
+  it('offers original links without marking saved or repeatedly querying the gateway when CORS blocks an unknown CDN', async () => {
+    const record = task('cors')
+    await db.saveTask(record)
+    useVideoStore.setState({ tasks: [record] })
+    const fetch = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new TypeError('Failed to fetch'))
+    await downloadVideos([record], 'files')
+    expect(fetch).toHaveBeenCalledTimes(1)
+    expect(useVideoDownloads.getState().entries[0]).toMatchObject({ state: 'failed', originalUrl: record.videoUrl })
+    expect((await db.readOne<VideoTask>('videoTasks', record.id))?.downloadedAt).toBeUndefined()
+    expect(click).not.toHaveBeenCalled()
+  })
+  it('marks saved files after successful proxy download', async () => {
+    const record = { ...task('cors'), videoUrl: 'https://ark-acg-cn-beijing.tos-cn-beijing.volces.com/result.mp4' }
+    await db.saveTask(record)
+    useVideoStore.setState({ tasks: [record] })
+    vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(new TypeError('Failed to fetch')).mockResolvedValueOnce(new Response(new Uint8Array([1]), { headers: { 'Content-Type': 'video/mp4', 'X-Video-Download-Proxy': '1' } }))
+    await downloadVideos([record], 'files')
+    expect(click).toHaveBeenCalledTimes(1)
+    expect((await db.readOne<VideoTask>('videoTasks', record.id))?.downloadedAt).toBeDefined()
+  })
   it('does not send gateway credentials to result CDN', async () => {
     const fetch = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(new Uint8Array([1, 2, 3]), { headers: { 'Content-Type': 'video/mp4' } }))
     const result = await readMedia('https://cdn.example/v.mp4', new AbortController().signal, 10, () => {})
