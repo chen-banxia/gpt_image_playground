@@ -38,7 +38,9 @@ export function stripImageCompositionPrompt(prompt: string | undefined) {
 }
 
 /** 仅为已知 codex2api Images 模型选择超分别名，不改写自定义模型或用户显式选择的别名。 */
-export function resolveUpscaleModel(model: string, size: string) {
+export function resolveUpscaleModel(model: string, size: string, baseUrl?: string) {
+  // 官方端点接受原生 size，不识别 codex2api 的超分别名。
+  if (baseUrl && /^https?:\/\/api\.openai\.com(?=[:/]|$)/i.test(baseUrl)) return model
   if (!['gpt-image-2', 'gpt-image-2.5-flare', 'gpt-image-2.5-sunburst'].includes(model)) return model
   const target = parseOutputSize(size)
   // 按像素预算选择网关档位；后缀只触发网关超分，不代表模型原生质量。

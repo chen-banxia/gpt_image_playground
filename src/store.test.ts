@@ -68,6 +68,44 @@ describe('filled output copy', () => {
 })
 
 describe('image upgrade preferences', () => {
+  it('upgrades the previous Sunburst default across profiles without resetting current preferences or history', () => {
+    const oldModel = 'gpt-image-2.5-sunburst'
+    const base = { ...DEFAULT_SETTINGS.profiles[0], model: oldModel, imageGenerationModel: oldModel }
+    const before = {
+      settings: {
+        ...DEFAULT_SETTINGS, model: oldModel, imageGenerationModel: oldModel, language: 'en', rememberApiKey: false,
+        profiles: [base,
+          { ...base, id: 'responses', apiMode: 'responses', model: 'gpt-5.5' },
+          { ...base, id: 'custom', model: 'custom-image', imageGenerationModel: '' },
+          { ...base, id: 'flare', model: 'gpt-image-2.5-flare' },
+          { ...base, id: 'fal', provider: 'fal' },
+        ],
+      },
+      params: { ...DEFAULT_PARAMS, stream: false, quality: 'medium', size_fit: 'cover' },
+      tasks: [task({ apiModel: oldModel })], prompt: 'keep me',
+    }
+    const after = migrateImagePreferences(before, 6) as typeof before
+    expect(after.settings).toMatchObject({ model: 'gpt-image-2.6-sunburst', imageGenerationModel: 'gpt-image-2.6-sunburst', language: 'en', rememberApiKey: false })
+    expect(after.settings.profiles[0]).toMatchObject({ model: 'gpt-image-2.6-sunburst', imageGenerationModel: 'gpt-image-2.6-sunburst' })
+    expect(after.settings.profiles[1]).toMatchObject({ model: 'gpt-5.5', imageGenerationModel: 'gpt-image-2.6-sunburst' })
+    expect(after.settings.profiles[2]).toEqual(before.settings.profiles[2])
+    expect(after.settings.profiles[3].model).toBe('gpt-image-2.5-flare')
+    expect(after.settings.profiles[4]).toEqual(before.settings.profiles[4])
+    expect(after.params).toBe(before.params)
+    expect(after.tasks).toBe(before.tasks)
+    expect(after.prompt).toBe(before.prompt)
+    expect(before.settings.model).toBe(oldModel)
+    expect(migrateImagePreferences(before, 7)).toBe(before)
+  })
+
+  it('upgrades legacy flat settings and keeps the active fal profile unchanged', () => {
+    const legacy = { settings: { model: 'gpt-image-2.5-sunburst', apiKey: 'saved-key' } }
+    expect(migrateImagePreferences(legacy, 6)).toMatchObject({ settings: { model: 'gpt-image-2.6-sunburst', apiKey: 'saved-key' } })
+    const profile = { ...DEFAULT_SETTINGS.profiles[0], provider: 'fal', model: 'gpt-image-2.5-sunburst', imageGenerationModel: 'gpt-image-2.5-sunburst' }
+    const before = { settings: { ...DEFAULT_SETTINGS, ...profile, profiles: [profile], activeProfileId: profile.id } }
+    expect(migrateImagePreferences(before, 6)).toEqual(before)
+  })
+
   it('enables Chinese, streaming and local key storage once while retaining credentials', () => {
     const before = {
       settings: { ...DEFAULT_SETTINGS, language: 'en', rememberApiKey: false, apiKey: 'local-test-key' },
@@ -76,7 +114,7 @@ describe('image upgrade preferences', () => {
     const after = migrateImagePreferences(before, 5) as typeof before
     expect(after.settings).toMatchObject({ language: 'zh', rememberApiKey: true, apiKey: 'local-test-key' })
     expect(after.params).toMatchObject({ stream: true, quality: 'medium' })
-    expect(migrateImagePreferences(before, 6)).toBe(before)
+    expect(migrateImagePreferences(before, 7)).toBe(before)
   })
   it.each([2, 3])('restores original output for stored version %s without changing model, quality or history', (version) => {
     const before = {
@@ -88,14 +126,14 @@ describe('image upgrade preferences', () => {
     expect(after.params).toMatchObject({ size: '3840x1648', size_fit: 'none', quality: 'low' })
     expect(after.settings).toMatchObject({ ...before.settings, language: 'zh', rememberApiKey: true })
     expect(after.tasks).toBe(before.tasks)
-    expect(migrateImagePreferences(before, 6)).toBe(before)
+    expect(migrateImagePreferences(before, 7)).toBe(before)
   })
   it('migrates the previous model default while preserving auto quality, size and input', async () => {
     const result = migrateImagePreferences({
       settings: { model: 'gpt-image-2.5-flare', apiKey: 'saved-key' },
       params: { ...DEFAULT_PARAMS, quality: 'auto', size: '2048x2048' }, prompt: 'keep me',
     }, 1) as { settings: typeof DEFAULT_SETTINGS; params: typeof DEFAULT_PARAMS; prompt: string }
-    expect(result.settings.model).toBe('gpt-image-2.5-sunburst')
+    expect(result.settings.model).toBe('gpt-image-2.6-sunburst')
     expect(result.settings.apiKey).toBe('saved-key')
     expect(result.params).toMatchObject({ quality: 'auto', size: '2048x2048' })
     expect(result.prompt).toBe('keep me')
@@ -106,7 +144,7 @@ describe('image upgrade preferences', () => {
     const result = migrateImagePreferences(before, 4) as typeof before
     expect(result.params).toMatchObject({ quality: 'auto', size_fit: 'cover' })
     expect(result.tasks).toBe(before.tasks)
-    expect(migrateImagePreferences(before, 6)).toBe(before)
+    expect(migrateImagePreferences(before, 7)).toBe(before)
   })
 
   it('tracks previews only for running tasks and clears them without writing final outputs', () => {

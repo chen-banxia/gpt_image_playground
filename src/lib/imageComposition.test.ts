@@ -3,6 +3,11 @@ import { buildImageCompositionPrompt, resolveUpscaleModel, stripImageComposition
 import { DEFAULT_PARAMS } from '../types'
 
 describe('request-only image composition', () => {
+  it('keeps official model IDs at api.openai.com while retaining gateway upscale routing', () => {
+    expect(resolveUpscaleModel('gpt-image-2.5-sunburst', '3840x2160', 'https://api.openai.com/v1')).toBe('gpt-image-2.5-sunburst')
+    expect(resolveUpscaleModel('gpt-image-2.5-sunburst', '3840x2160', 'https://colorflowai.com/v1')).toBe('gpt-image-2.5-sunburst-4k')
+    expect(resolveUpscaleModel('gpt-image-2.6-sunburst', '3840x2160', 'https://api.openai.com/v1')).toBe('gpt-image-2.6-sunburst')
+  })
   it('does not invent a target for auto size', () => {
     expect(buildImageCompositionPrompt('dog', DEFAULT_PARAMS, false, false)).toBe('dog')
   })

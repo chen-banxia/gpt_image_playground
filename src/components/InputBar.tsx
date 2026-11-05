@@ -4,7 +4,8 @@ import { createPortal } from 'react-dom'
 import { useStore, submitTask, addImageFromFile } from '../store'
 import { DEFAULT_PARAMS } from '../types'
 import { getActiveApiProfile } from '../lib/apiProfiles'
-import { IMAGE_MODEL_OPTIONS, isKnownImageModel, isGptImage25Model } from '../lib/imageModels'
+import { IMAGE_MODEL_OPTIONS, isKnownImageModel, isGptImage26Model, supportsExtendedImageQuality } from '../lib/imageModels'
+import { requiresOriginalOutput } from '../lib/imageFormats'
 import { DEFAULT_FAL_IMAGE_SIZE, getChangedParams, getOutputImageLimitForSettings, normalizeParamsForSettings } from '../lib/paramCompatibility'
 import { normalizeImageSize } from '../lib/size'
 import { createMaskPreviewDataUrl } from '../lib/canvasImage'
@@ -147,6 +148,9 @@ export default function InputBar({ collapsed, onToggle }: InputBarProps) {
   const activeProvider = activeProfile.provider
   const isFalProvider = activeProvider === 'fal'
   const activeModel = activeProfile.apiMode === 'responses' ? activeProfile.imageGenerationModel ?? '' : activeProfile.model
+  // 格式与复杂度跟随实际图像模型，不能根据 Responses 的文本模型判断。
+  const supports26 = !isFalProvider && isGptImage26Model(activeModel)
+  const preserveOriginal = requiresOriginalOutput(params.output_format)
   // fal 的模型是 endpoint（来自 Provider 配置），不属于这里的画图模型列表
   const modelSelectDisabled = isFalProvider
   const modelOptions = [
@@ -161,8 +165,8 @@ export default function InputBar({ collapsed, onToggle }: InputBarProps) {
       : []),
   ]
   const moderationDisabled = isFalProvider
-  const compressionDisabled = params.output_format === 'png' || isFalProvider
-  const outputImageLimit = getOutputImageLimitForSettings(settings)
+  const compressionDisabled = !['jpeg', 'webp'].includes(params.output_format) || isFalProvider
+  const outputImageLimit = params.output_format === 'svg' ? 1 : getOutputImageLimitForSettings(settings)
   const nLimitHintText = isFalProvider
     ? t('maxFalRequests', { count: outputImageLimit })
     : t('maxOpenAIRequests', { count: outputImageLimit })
@@ -180,7 +184,7 @@ export default function InputBar({ collapsed, onToggle }: InputBarProps) {
         { label: 'low', value: 'low' },
         { label: 'medium', value: 'medium' },
         { label: 'high', value: 'high' },
-        ...(isGptImage25Model(activeModel) ? [{ label: 'xhigh', value: 'xhigh' }, { label: 'max', value: 'max' }] : []),
+        ...(supportsExtendedImageQuality(activeModel) ? [{ label: 'xhigh', value: 'xhigh' }, { label: 'max', value: 'max' }] : []),
       ]
   const atImageLimit = inputImages.length >= API_MAX_IMAGES
   const maskTargetImage = maskDraft
@@ -924,15 +928,19 @@ export default function InputBar({ collapsed, onToggle }: InputBarProps) {
         onClick={showSizeHint}
       >
         <span className="text-gray-400 dark:text-gray-500 ml-1">{t('size')}</span>
-        <button
+        {preserveOriginal ? <Select portal value={params.size}
+          onChange={(size) => setParams({ size: String(size), size_fit: 'none' })}
+          options={[...new Set(['auto', ...(params.output_format === 'gif' ? ['256x256', '512x512'] : ['1024x1024', '1536x1024', '1024x1536']), params.size])].map(value => ({ label: value, value }))}
+          className={selectClass}
+        /> : <button
           type="button"
           onClick={() => setShowSizePicker(true)}
           className="px-3 py-1.5 rounded-xl border border-gray-200/60 dark:border-white/[0.08] bg-white/50 dark:bg-white/[0.03] hover:bg-white dark:hover:bg-white/[0.06] focus:outline-none text-xs text-left transition-all duration-200 shadow-sm font-mono truncate"
           title={t('parametersBestEffort')}
         >
           {displaySize}
-        </button>
-        {displaySize !== 'auto' && (
+        </button>}
+        {!preserveOriginal && displaySize !== 'auto' && (
           <span className="ml-1 text-[10px] text-gray-500 dark:text-gray-400">
             {t(params.size_fit === 'pad' ? 'sizeFitPad' : params.size_fit === 'cover' ? 'sizeFitCover' : 'sizeFitNone')}
           </span>
@@ -967,15 +975,49 @@ export default function InputBar({ collapsed, onToggle }: InputBarProps) {
         <span className="text-gray-400 dark:text-gray-500 ml-1">{t('format')}</span>
         <Select portal
           value={params.output_format}
-          onChange={(val) => setParams({ output_format: val as typeof params.output_format, ...(val === 'jpeg' ? { transparent_output: false } : {}) })}
+          onChange={(val) => setParams({
+            output_format: val as typeof params.output_format,
+            ...(val === 'jpeg' ? { transparent_output: false } : {}),
+            ...(requiresOriginalOutput(String(val)) ? { stream: false, transparent_output: false, size_fit: 'none', output_compression: null } : {}),
+            ...(val === 'gif' ? { size: 'auto', frame_count: 9, frame_duration_ms: 200 } : {}),
+            ...(val === 'svg' ? { n: 1 } : {}),
+          })}
           options={[
             { label: 'PNG', value: 'png' },
             { label: 'JPEG', value: 'jpeg' },
             { label: 'WebP', value: 'webp' },
+            ...(supports26 ? [{ label: 'GIF', value: 'gif' }, { label: 'SVG', value: 'svg' }] : []),
           ]}
           className={selectClass}
         />
       </label>
+      {supports26 && <label className="flex flex-col gap-0.5 min-w-0" title={t('complexityHint')}>
+        <span className="text-gray-400 dark:text-gray-500 ml-1">{t('complexity')}</span>
+        <Select portal value={params.complexity ?? 'default'}
+          onChange={(value) => setParams({ complexity: value === 'default' ? undefined : value as 'low' | 'medium' | 'high' })}
+          options={[{ label: t('complexityDefault'), value: 'default' }, ...['low', 'medium', 'high'].map(value => ({ label: value, value }))]}
+          className={selectClass} />
+      </label>}
+      {params.output_format === 'gif' && <>
+        <label className="flex flex-col gap-0.5 min-w-0">
+          <span className="text-gray-400 dark:text-gray-500 ml-1">{t('frameCount')}</span>
+          <Select portal value={String(params.frame_count ?? 9)}
+            onChange={(value) => setParams({ frame_count: Number(value) })}
+            options={Array.from({ length: 15 }, (_, i) => ({ label: String(i + 2), value: String(i + 2) }))}
+            className={selectClass} />
+        </label>
+        <label className="flex flex-col gap-0.5 min-w-0">
+          <span className="text-gray-400 dark:text-gray-500 ml-1">{t('frameDuration')}</span>
+          <input key={params.frame_duration_ms} defaultValue={params.frame_duration_ms ?? 200}
+            type="number" min={20} max={2000} step={10} className={selectClass}
+            onBlur={(event) => {
+              const value = event.target.value === '' ? 200 : Number(event.target.value)
+              const duration = Number.isFinite(value) ? Math.round(Math.min(2000, Math.max(20, value)) / 10) * 10 : 200
+              event.target.value = String(duration)
+              setParams({ frame_duration_ms: duration })
+            }} />
+        </label>
+      </>}
       <label
         className="relative flex flex-col gap-0.5 min-w-0"
         onMouseEnter={showCompressionHint}
@@ -1039,6 +1081,7 @@ export default function InputBar({ collapsed, onToggle }: InputBarProps) {
         <span className="text-gray-400 dark:text-gray-500 ml-1">{t('transparentBackground')}</span>
         <Select portal
           value={params.transparent_output ? params.transparent_method ?? 'native' : 'off'}
+          disabled={preserveOriginal}
           onChange={(value) => setParams({
             transparent_output: value !== 'off',
             transparent_method: value === 'local' ? 'local' : 'native',
@@ -1056,7 +1099,7 @@ export default function InputBar({ collapsed, onToggle }: InputBarProps) {
         <span className="text-gray-400 dark:text-gray-500 ml-1">{t('streamPreview')}</span>
         <Select portal value={params.stream && !isFalProvider ? 'on' : 'off'}
           onChange={(value) => setParams({ stream: value === 'on' })}
-          disabled={isFalProvider}
+          disabled={isFalProvider || preserveOriginal}
           options={[{ label: t('disabled'), value: 'off' }, { label: t('enabled'), value: 'on' }]}
           className={selectClass}
         />
@@ -1088,6 +1131,7 @@ export default function InputBar({ collapsed, onToggle }: InputBarProps) {
         />
         <ButtonTooltip visible={nLimitHintVisible} text={nLimitHintText} />
       </label>
+      {preserveOriginal && <p className="col-span-full text-[11px] text-gray-500 dark:text-gray-400">{t('originalOutputHint')}{(inputImages.length > 0 || maskDraft) && <span className="block text-amber-600">{t('generationOnlyFormat')}</span>}</p>}
     </div>
   )
 

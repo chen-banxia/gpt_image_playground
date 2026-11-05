@@ -32,6 +32,7 @@ import { applyExactImageSize } from './lib/exactImageSize'
 import { parseOutputSize } from './lib/size'
 import { orderInputImagesForMask } from './lib/mask'
 import { getChangedParams, normalizeParamsForSettings } from './lib/paramCompatibility'
+import { imageExtension, isOriginalImageDataUrl, requiresOriginalOutput } from './lib/imageFormats'
 import { zipSync, unzipSync, strToU8, strFromU8 } from 'fflate'
 import { translate, type TranslationKey } from './i18n'
 import { resolveTaskGroup } from './lib/taskGroups'
@@ -170,6 +171,28 @@ interface AppState {
 }
 
 export function migrateImagePreferences(persistedState: unknown, version: number) {
+  if (version >= 7) return persistedState as never
+  const state = migrateLegacyImagePreferences(persistedState, version) as Record<string, unknown> | null
+  if (!state?.settings) return state as never
+  // 只迁移上一版默认模型；用户选择的其他模型、参数与历史任务保持原样。
+  const upgradeModel = <T extends Partial<ApiProfile>>(profile: T): T => ({
+    ...profile,
+    ...(profile.apiMode !== 'responses' && profile.model === 'gpt-image-2.5-sunburst'
+      ? { model: DEFAULT_SETTINGS.model } : {}),
+    ...(profile.imageGenerationModel === 'gpt-image-2.5-sunburst'
+      ? { imageGenerationModel: DEFAULT_SETTINGS.imageGenerationModel } : {}),
+  })
+  const settings = state.settings as Partial<AppSettings>
+  const profiles = settings.profiles?.map((profile) => profile.provider === 'openai' ? upgradeModel(profile) : profile)
+  const active = profiles?.find((profile) => profile.id === settings.activeProfileId) ?? profiles?.[0]
+  const upgraded = active?.provider === 'fal' ? settings : upgradeModel(settings)
+  return {
+    ...state,
+    settings: { ...upgraded, ...(profiles ? { profiles } : {}) },
+  } as never
+}
+
+function migrateLegacyImagePreferences(persistedState: unknown, version: number) {
   const state = { ...((persistedState ?? {}) as Record<string, unknown>) }
   if (version >= 6) return persistedState as never
   // 本次升级统一更新默认体验，仅迁移当前偏好；后续手动切换仍会持久化。
@@ -381,7 +404,7 @@ export const useStore = create<AppState>()(
     }),
     {
       name: 'gpt-image-playground',
-      version: 6,
+      version: 7,
       migrate: migrateImagePreferences,
       partialize: (state) => {
         const shouldRememberApiKey = state.settings.rememberApiKey
@@ -730,6 +753,11 @@ export async function submitTask(options: { allowFullMask?: boolean } = {}) {
     return
   }
 
+  if (requiresOriginalOutput(params.output_format) && (inputImages.length || maskDraft)) {
+    showToast(tr('generationOnlyFormat'), 'error')
+    return
+  }
+
   let orderedInputImages = inputImages
   let maskImageId: string | null = null
   let maskTargetImageId: string | null = null
@@ -1017,6 +1045,7 @@ export async function createFilledOutput(taskId: string, imageId: string) {
   if (!parseOutputSize(task.params.size)) throw new Error(tr('invalidOutputSize'))
   const source = await ensureImageCached(imageId)
   if (!source) throw new Error(tr('inputImageMissing'))
+  if (isOriginalImageDataUrl(source) || requiresOriginalOutput(task.params.output_format)) throw new Error(tr('originalOutputRequired'))
   const reported = task.actualParamsByImage?.[imageId] ?? task.actualParams
   const params: TaskParams = { ...task.params, size_fit: 'cover', n: 1 }
   const result = await applyExactImageSize(source, params, undefined,
@@ -1239,8 +1268,8 @@ export async function clearAllData() {
 
 /** 从 dataUrl 解析出 MIME 扩展名和二进制数据 */
 function dataUrlToBytes(dataUrl: string): { ext: string; bytes: Uint8Array } {
-  const match = dataUrl.match(/^data:image\/(\w+);base64,/)
-  const ext = match?.[1] ?? 'png'
+  const match = dataUrl.match(/^data:(image\/[\w.+-]+);base64,/)
+  const ext = imageExtension(match?.[1] ?? 'image/png')
   const b64 = dataUrl.replace(/^data:[^;]+;base64,/, '')
   const binary = atob(b64)
   const bytes = new Uint8Array(binary.length)
@@ -1251,7 +1280,7 @@ function dataUrlToBytes(dataUrl: string): { ext: string; bytes: Uint8Array } {
 /** 将二进制数据还原为 dataUrl */
 function bytesToDataUrl(bytes: Uint8Array, filePath: string): string {
   const ext = filePath.split('.').pop()?.toLowerCase() ?? 'png'
-  const mimeMap: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp' }
+  const mimeMap: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif', svg: 'image/svg+xml' }
   const mime = mimeMap[ext] ?? 'image/png'
   let binary = ''
   for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i])

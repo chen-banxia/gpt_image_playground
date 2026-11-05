@@ -7,6 +7,7 @@ import DownloadBadge from './DownloadBadge'
 import GroupPicker from './GroupPicker'
 import ImageToVideoButton from '../features/video/ImageToVideoButton'
 import { downloadImage } from '../lib/downloadImage'
+import { isOriginalImageDataUrl, requiresOriginalOutput } from '../lib/imageFormats'
 import { formatImageRatio, parseOutputSize } from '../lib/size'
 import { ActualValueBadge, DetailParamValue } from '../lib/paramDisplay'
 import { copyBlobToClipboard, copyTextToClipboard, getClipboardFailureMessage } from '../lib/clipboard'
@@ -579,7 +580,7 @@ export default function DetailModal() {
                     {' · '}{t(currentActualParams.size_fit === 'cover' ? 'sizeFitCover' : 'sizeFitPad')}
                   </div>
                 )}
-                {task.status === 'done' && currentOutputImageId && parseOutputSize(task.params.size) && (
+                {task.status === 'done' && currentOutputImageId && !isOriginalImageDataUrl(currentOutputImageSrc) && !requiresOriginalOutput(task.params.output_format) && parseOutputSize(task.params.size) && (
                   <div className="mt-2">
                     <button type="button" disabled={filling}
                       className="rounded-lg bg-blue-50 px-2 py-1 text-blue-600 hover:bg-blue-100 disabled:opacity-50 dark:bg-blue-500/10 dark:text-blue-300"
@@ -629,6 +630,12 @@ export default function DetailModal() {
                   <DetailParamValue task={task} paramKey="output_compression" className="font-medium" actualParams={currentActualParams} />
                 </div>
               )}
+              {(['complexity', 'frame_count', 'frame_duration_ms'] as const).filter(key => task.params[key] != null).map(key => (
+                <div key={key} className="bg-gray-50 dark:bg-white/[0.03] rounded-lg px-3 py-2">
+                  <span className="text-gray-400 dark:text-gray-500">{t(key === 'frame_count' ? 'frameCount' : key === 'frame_duration_ms' ? 'frameDuration' : 'complexity')}</span><br />
+                  <DetailParamValue task={task} paramKey={key} className="font-medium" actualParams={currentActualParams} />
+                </div>
+              ))}
               {task.params.transparent_output && (
                 <div className="bg-gray-50 dark:bg-white/[0.03] rounded-lg px-3 py-2">
                   <span className="text-gray-400 dark:text-gray-500">{t('transparentBackground')}</span><br />

@@ -62,8 +62,10 @@ function normalizeDimensions(width: number, height: number) {
 
 export function normalizeImageSize(size: string) {
   const trimmed = size.trim()
+  if (trimmed === 'auto') return trimmed
   const match = trimmed.match(SIZE_PATTERN)
-  if (!match) return trimmed
+  if (!match) return 'auto'
+  if (![Number(match[1]), Number(match[2])].every(value => Number.isSafeInteger(value) && value > 0)) return 'auto'
 
   const { width, height } = normalizeDimensions(Number(match[1]), Number(match[2]))
   return `${width}x${height}`

@@ -44,11 +44,14 @@ export interface TaskParams {
   /** 本地尺寸处理前解码得到的尺寸，仅用于结果元数据。 */
   source_size?: string
   quality: 'auto' | 'low' | 'medium' | 'high' | 'xhigh' | 'max'
+  complexity?: 'low' | 'medium' | 'high'
+  frame_count?: number
+  frame_duration_ms?: number
   transparent_output?: boolean
   transparent_method?: 'native' | 'local'
   stream?: boolean
   background?: 'auto' | 'transparent' | 'opaque'
-  output_format: 'png' | 'jpeg' | 'webp'
+  output_format: 'png' | 'jpeg' | 'webp' | 'gif' | 'svg'
   output_compression: number | null
   moderation: 'auto' | 'low'
   n: number
@@ -152,6 +155,9 @@ export interface ImageGenerationRequest {
   prompt: string
   size: string
   quality: string
+  complexity?: TaskParams['complexity']
+  frame_count?: number
+  frame_duration_ms?: number
   output_format: string
   moderation: string
   output_compression?: number

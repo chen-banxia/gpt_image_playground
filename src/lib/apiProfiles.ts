@@ -3,7 +3,7 @@ import { translate } from '../i18n'
 import { readRuntimeEnv } from './runtimeEnv'
 
 const DEFAULT_BASE_URL = readRuntimeEnv(import.meta.env.VITE_DEFAULT_API_URL) || 'https://colorflowai.com/v1'
-export const DEFAULT_IMAGES_MODEL = 'gpt-image-2.5-sunburst'
+export const DEFAULT_IMAGES_MODEL = 'gpt-image-2.6-sunburst'
 export const DEFAULT_RESPONSES_MODEL = 'gpt-5.5'
 export const DEFAULT_FAL_BASE_URL = 'https://fal.run'
 export const DEFAULT_FAL_MODEL = 'openai/gpt-image-2'

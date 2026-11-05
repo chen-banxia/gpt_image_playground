@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { calculateImageSize, normalizeImageSize } from './size'
 
 describe('image resolution presets', () => {
+  it.each(['bogus', '0x0', '0x1024', '999999999999999999999999x1024', '', '-1x1024'])('does not send invalid size %s to the API', size => {
+    expect(normalizeImageSize(size)).toBe('auto')
+  })
   it.each([
     ['1K', '16:9', '1280x720'], ['2K', '16:9', '2560x1440'],
     ['2K', '1:1', '2048x2048'], ['2K', '2:3', '1440x2160'],

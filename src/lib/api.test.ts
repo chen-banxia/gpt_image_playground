@@ -1,12 +1,103 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { DEFAULT_PARAMS } from '../types'
 import { DEFAULT_SETTINGS } from './apiProfiles'
-import { callImageApi } from './api'
+import { callImageApi, finalizeImageResult } from './api'
 import { fetchImageUrlAsDataUrl } from './imageApiShared'
 import * as transparentImage from './transparentImage'
 import * as exactImageSize from './exactImageSize'
 
 describe('callImageApi', () => {
+  it('rejects excessive Images prompts after adding request instructions, and excessive reference counts', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
+    const opts = { settings: DEFAULT_SETTINGS, params: DEFAULT_PARAMS, prompt: 'x'.repeat(32_000), inputImageDataUrls: [] as string[] }
+    await expect(callImageApi(opts)).rejects.toThrow('32000')
+    await expect(callImageApi({ ...opts, prompt: 'edit', inputImageDataUrls: Array(17).fill('data:image/png;base64,Zg==') })).rejects.toThrow()
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it.each(['images', 'responses'] as const)('rejects orphan masks and animated GIF inputs in %s before any request', async apiMode => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
+    const opts = { settings: { ...DEFAULT_SETTINGS, apiMode }, params: DEFAULT_PARAMS, prompt: 'edit', inputImageDataUrls: [] as string[] }
+    await expect(callImageApi({ ...opts, maskDataUrl: 'data:image/png;base64,Zg==' })).rejects.toThrow()
+    // Two frames with a loop extension and frame timing.
+    const gif = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH/C05FVFNDQVBFMi4wAwEAAAAh+QQAFAAAACwAAAAAAQABAAACAkQBACH5BAAUAAAALAAAAAABAAEAAAICTAEAOw=='
+    await expect(callImageApi({ ...opts, inputImageDataUrls: [gif] })).rejects.toThrow('GIF')
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+  describe.each(['gpt-image-2.6', 'gpt-image-2.6-flare', 'gpt-image-2.6-sunburst'])('%s', (model) => {
+    it.each(['generation', 'edit', 'responses'])('preserves the exact model and existing fields for %s requests', async (mode) => {
+      const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+        if (String(url).startsWith('data:')) return new Response(new Blob(['png'], { type: 'image/png' }))
+        const payload = mode === 'responses'
+          ? { output: [{ type: 'image_generation_call', result: 'Zg==' }] }
+          : { data: [{ b64_json: 'Zg==' }] }
+        return new Response(JSON.stringify(payload), { headers: { 'Content-Type': 'application/json' } })
+      })
+      await callImageApi({
+        settings: { ...DEFAULT_SETTINGS, apiKey: 'test', apiMode: mode === 'responses' ? 'responses' : 'images', model: mode === 'responses' ? 'gpt-5.5' : model, imageGenerationModel: model },
+        prompt: 'draw', inputImageDataUrls: mode === 'edit' ? ['data:image/png;base64,Zg=='] : [],
+        params: { ...DEFAULT_PARAMS, size: '3840x2160', quality: 'high', complexity: 'low', output_format: 'webp', output_compression: 85, moderation: 'low', transparent_output: true, stream: true },
+      })
+      const [url, init] = fetchMock.mock.calls[fetchMock.mock.calls.length - 1]
+      expect(String(url)).toContain(mode === 'responses' ? '/responses' : mode === 'edit' ? '/images/edits' : '/images/generations')
+      const multipart = init?.body instanceof FormData
+      const body = multipart ? Object.fromEntries((init.body as FormData).entries()) : JSON.parse(String(init?.body))
+      const imageRequest = mode === 'responses' ? body.tools[0] : body
+      expect(imageRequest).toMatchObject({ model, size: '3840x2160', quality: 'high', output_format: 'webp', output_compression: multipart ? '85' : 85, moderation: 'low', background: 'transparent', partial_images: multipart ? '2' : 2 })
+      expect(body.stream).toBe(multipart ? 'true' : true)
+      expect(imageRequest.response_format).toBeUndefined()
+      expect(imageRequest.complexity).toBe(model === 'gpt-image-2.6' ? undefined : 'low')
+      expect(imageRequest.frame_count).toBeUndefined()
+      if (mode === 'responses') expect(body.model).toBe('gpt-5.5')
+    })
+  })
+
+  describe.each(['images', 'responses'] as const)('%s new formats', (apiMode) => {
+    it.each(['gif', 'svg'] as const)('sends %s without unsupported fields and preserves the encoded output', async (output_format) => {
+      const base64 = output_format === 'gif' ? 'R0lGODlhAQABAIAAAAAAAP///yH/C05FVFNDQVBFMi4wAwEAAAAh+QQAFAAAACwAAAAAAQABAAACAkQBACH5BAAUAAAALAAAAAABAAEAAAICTAEAOw==' : btoa('<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"><path d="M0 0L256 256"/></svg>')
+      const payload = apiMode === 'images'
+        ? { data: [{ b64_json: base64 }], output_format, frame_count: 9, frame_duration_ms: 200 }
+        : { output: [{ type: 'image_generation_call', result: base64, output_format, frame_count: 9, frame_duration_ms: 200 }] }
+      const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify(payload)))
+      const resize = vi.spyOn(exactImageSize, 'applyExactImageSize')
+      const remove = vi.spyOn(transparentImage, 'removeKeyedBackgroundFromDataUrl')
+      const result = await callImageApi({
+        settings: { ...DEFAULT_SETTINGS, apiKey: 'test', apiMode, model: apiMode === 'images' ? DEFAULT_SETTINGS.model : 'gpt-5.5' },
+        prompt: 'a looping lantern', inputImageDataUrls: [],
+        params: { ...DEFAULT_PARAMS, output_format, quality: 'max', complexity: 'medium', size: output_format === 'gif' ? '256x256' : '1024x1024', size_fit: 'cover', stream: true, transparent_output: true, transparent_method: 'local', output_compression: 80 },
+      })
+      const body = JSON.parse(String(fetchMock.mock.calls[0][1]?.body))
+      const sent = apiMode === 'images' ? body : body.tools[0]
+      expect(sent).toMatchObject({ model: 'gpt-image-2.6-sunburst', output_format, quality: 'max', complexity: 'medium', size: output_format === 'gif' ? '256x256' : '1024x1024' })
+      for (const key of ['partial_images', 'output_compression', 'background', 'prompt_rewriter']) expect(sent[key]).toBeUndefined()
+      expect(body.stream).toBeUndefined()
+      expect(sent.frame_count).toBe(output_format === 'gif' ? 9 : undefined)
+      expect(sent.frame_duration_ms).toBe(output_format === 'gif' ? 200 : undefined)
+      expect(result.images).toEqual([`data:image/${output_format === 'svg' ? 'svg+xml' : 'gif'};base64,${base64}`])
+      expect(result.actualParams?.output_format).toBe(output_format)
+      expect(resize).not.toHaveBeenCalled()
+      expect(remove).not.toHaveBeenCalled()
+    })
+
+    it.each(['gif', 'svg'] as const)('rejects %s edits and masks before making a request', async (output_format) => {
+      const fetchMock = vi.spyOn(globalThis, 'fetch')
+      const options = { settings: { ...DEFAULT_SETTINGS, apiMode, model: apiMode === 'images' ? DEFAULT_SETTINGS.model : 'gpt-5.5' }, prompt: 'edit', params: { ...DEFAULT_PARAMS, output_format }, inputImageDataUrls: ['data:image/png;base64,Zg=='] }
+      await expect(callImageApi(options)).rejects.toThrow()
+      await expect(callImageApi({ ...options, inputImageDataUrls: [], maskDataUrl: 'data:image/png;base64,Zg==' })).rejects.toThrow()
+      expect(fetchMock).not.toHaveBeenCalled()
+    })
+  })
+
+  it('preserves an unexpected GIF response even when raster postprocessing was requested', async () => {
+    const image = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH/C05FVFNDQVBFMi4wAwEAAAAh+QQAFAAAACwAAAAAAQABAAACAkQBACH5BAAUAAAALAAAAAABAAEAAAICTAEAOw=='
+    const resize = vi.spyOn(exactImageSize, 'applyExactImageSize')
+    const remove = vi.spyOn(transparentImage, 'removeKeyedBackgroundFromDataUrl')
+    const result = await finalizeImageResult({ images: [image] }, { ...DEFAULT_PARAMS, size: '2048x2048', size_fit: 'cover', transparent_output: true, transparent_method: 'local' })
+    expect(result.images).toEqual([image])
+    expect(resize).not.toHaveBeenCalled()
+    expect(remove).not.toHaveBeenCalled()
+  })
+
   it.each(['gpt-image-2.5-flare', 'gpt-image-2.5-flare-2k', 'gpt-image-2.5-sunburst-4k'])(
     'preserves the gateway image for %s by default without local resizing', async (model) => {
       const resize = vi.spyOn(exactImageSize, 'applyExactImageSize')
@@ -186,14 +277,14 @@ describe('callImageApi', () => {
     expect(result.images).toEqual(['data:image/png;base64,final0', 'data:image/png;base64,final1'])
   })
 
-  it('sends 2K, max quality and native transparency on Images requests with streaming enabled', async () => {
+  it('sends 2K, max quality and native transparency on GPT Image 2.5 requests with streaming enabled', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(
       'data: {"type":"image_generation.partial_image","partial_image_b64":"cA=="}\n\ndata: {"type":"image_generation.completed","b64_json":"Zg==","quality":"medium"}\n\n',
       { headers: { 'Content-Type': 'text/event-stream' } },
     ))
     const preview = vi.fn()
     const result = await callImageApi({
-      settings: { ...DEFAULT_SETTINGS, apiKey: 'test' }, prompt: 'draw', inputImageDataUrls: [],
+      settings: { ...DEFAULT_SETTINGS, model: 'gpt-image-2.5-sunburst', apiKey: 'test' }, prompt: 'draw', inputImageDataUrls: [],
       params: { ...DEFAULT_PARAMS, size: '2048x2048', quality: 'max', transparent_output: true, stream: true, size_fit: 'none' },
       onPartialImage: preview,
     })

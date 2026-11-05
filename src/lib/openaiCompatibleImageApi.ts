@@ -45,10 +45,16 @@ function createResponsesImageTool(
     moderation: params.moderation,
   }
   if (imageModel) tool.model = imageModel
+  // Responses 的图像参数属于工具；顶层 model 始终是负责调用工具的文本模型。
+  if (params.complexity) tool.complexity = params.complexity
+  if (params.output_format === 'gif') {
+    tool.frame_count = params.frame_count
+    tool.frame_duration_ms = params.frame_duration_ms
+  }
   if (params.transparent_output && params.transparent_method !== 'local') tool.background = 'transparent'
   if (params.stream) tool.partial_images = 2
 
-  if (params.output_format !== 'png' && params.output_compression != null) {
+  if (['jpeg', 'webp'].includes(params.output_format) && params.output_compression != null) {
     tool.output_compression = params.output_compression
   }
 
@@ -112,6 +118,8 @@ function parseResponsesImageResults(payload: ResponsesApiResponse, fallbackMime:
 }
 
 export async function callOpenAICompatibleImageApi(opts: CallApiOptions, profile: ApiProfile): Promise<CallApiResult> {
+  if (opts.maskDataUrl && !opts.inputImageDataUrls.length) throw new Error(tCurrent('maskRequiresInput'))
+  if (profile.apiMode === 'images' && opts.inputImageDataUrls.length > 16) throw new Error(tCurrent('imageLimitReached', { count: 16 }))
   return profile.apiMode === 'responses'
     ? callResponsesImageApi(opts, profile)
     : callImagesApi(opts, profile)
@@ -162,6 +170,8 @@ async function callImagesApiSingle(opts: CallApiOptions, profile: ApiProfile): P
   const prompt = profile.codexCli
     ? `${PROMPT_REWRITE_GUARD_PREFIX}\n${originalPrompt}`
     : originalPrompt
+  // 校验实际发出的提示词，包括构图要求与网关提示前缀；不截断用户内容。
+  if ([...prompt].length > 32_000) throw new Error(tCurrent('imagePromptTooLong'))
   const isEdit = inputImageDataUrls.length > 0
   const mime = MIME_MAP[params.output_format] || 'image/png'
   const proxyConfig = readClientDevProxyConfig()
@@ -178,13 +188,14 @@ async function callImagesApiSingle(opts: CallApiOptions, profile: ApiProfile): P
     formData.append('output_format', params.output_format)
     formData.append('moderation', params.moderation)
     formData.append('quality', params.quality)
+    if (params.complexity) formData.append('complexity', params.complexity)
     if (params.transparent_output && params.transparent_method !== 'local') formData.append('background', 'transparent')
     if (params.stream) {
       formData.append('stream', 'true')
       formData.append('partial_images', '2')
     }
 
-    if (params.output_format !== 'png' && params.output_compression != null) {
+    if (['jpeg', 'webp'].includes(params.output_format) && params.output_compression != null) {
       formData.append('output_compression', String(params.output_compression))
     }
     if (params.n > 1) {
@@ -235,6 +246,12 @@ async function callImagesApiSingle(opts: CallApiOptions, profile: ApiProfile): P
       moderation: params.moderation,
       quality: params.quality,
     }
+    if (params.complexity) body.complexity = params.complexity
+    // 帧数和帧时长仅对 GIF 有效，不能随静态图请求一起发送。
+    if (params.output_format === 'gif') {
+      body.frame_count = params.frame_count
+      body.frame_duration_ms = params.frame_duration_ms
+    }
 
     if (params.transparent_output && params.transparent_method !== 'local') body.background = 'transparent'
     if (params.stream) {
@@ -242,7 +259,7 @@ async function callImagesApiSingle(opts: CallApiOptions, profile: ApiProfile): P
       body.partial_images = 2
     }
 
-    if (params.output_format !== 'png' && params.output_compression != null) {
+    if (['jpeg', 'webp'].includes(params.output_format) && params.output_compression != null) {
       body.output_compression = params.output_compression
     }
     if (params.n > 1) {

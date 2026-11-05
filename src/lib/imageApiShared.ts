@@ -5,6 +5,8 @@ export const MIME_MAP: Record<string, string> = {
   png: 'image/png',
   jpeg: 'image/jpeg',
   webp: 'image/webp',
+  gif: 'image/gif',
+  svg: 'image/svg+xml',
 }
 
 export const MAX_MASK_EDIT_FILE_BYTES = 50 * 1024 * 1024
@@ -49,7 +51,8 @@ export function normalizeBase64Image(value: string, fallbackMime: string): strin
   // 部分反代忽略 output_format；以文件签名确定 MIME，避免把 PNG 当作 JPEG 保存。
   const mime = value.startsWith('iVBORw0KGgo') ? 'image/png'
     : value.startsWith('/9j/') ? 'image/jpeg'
-      : value.startsWith('UklGR') ? 'image/webp' : fallbackMime
+      : value.startsWith('UklGR') ? 'image/webp'
+        : value.startsWith('R0lGOD') ? 'image/gif' : fallbackMime
   return `data:${mime};base64,${value}`
 }
 
@@ -97,7 +100,7 @@ async function blobToDataUrl(blob: Blob, fallbackMime: string): Promise<string> 
     binary += String.fromCharCode(...chunk)
   }
 
-  return `data:${blob.type || fallbackMime};base64,${btoa(binary)}`
+  return normalizeBase64Image(btoa(binary), blob.type.startsWith('image/') ? blob.type : fallbackMime)
 }
 
 export async function fetchImageUrlAsDataUrl(url: string, fallbackMime: string, signal?: AbortSignal): Promise<string> {
@@ -163,12 +166,15 @@ export function pickActualParams(source: unknown): Partial<TaskParams> {
   if (record.quality === 'auto' || record.quality === 'low' || record.quality === 'medium' || record.quality === 'high' || record.quality === 'xhigh' || record.quality === 'max') {
     actualParams.quality = record.quality
   }
-  if (record.output_format === 'png' || record.output_format === 'jpeg' || record.output_format === 'webp') {
+  if (record.output_format === 'png' || record.output_format === 'jpeg' || record.output_format === 'webp' || record.output_format === 'gif' || record.output_format === 'svg') {
     actualParams.output_format = record.output_format
   }
   if (typeof record.output_compression === 'number') actualParams.output_compression = record.output_compression
   if (record.moderation === 'auto' || record.moderation === 'low') actualParams.moderation = record.moderation
   if (typeof record.n === 'number') actualParams.n = record.n
+  if (record.complexity === 'low' || record.complexity === 'medium' || record.complexity === 'high') actualParams.complexity = record.complexity
+  if (typeof record.frame_count === 'number') actualParams.frame_count = record.frame_count
+  if (typeof record.frame_duration_ms === 'number') actualParams.frame_duration_ms = record.frame_duration_ms
 
   return actualParams
 }
