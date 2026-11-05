@@ -1,4 +1,5 @@
 import { tCurrent } from '../i18n'
+import { imageExtension } from './imageFormats'
 
 /** 页面只能确认已向浏览器发起下载，无法判断用户是否取消保存或磁盘写入是否完成。 */
 export async function downloadImage(src: string, onStarted?: () => void) {
@@ -18,7 +19,7 @@ export async function downloadImage(src: string, onStarted?: () => void) {
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = url
-  link.download = `image-${Date.now()}.${blob.type.split('/')[1] === 'jpeg' ? 'jpg' : blob.type.split('/')[1]}`
+  link.download = `image-${Date.now()}.${imageExtension(blob.type)}`
   document.body.appendChild(link)
   try {
     link.click()

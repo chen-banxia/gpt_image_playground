@@ -1,6 +1,7 @@
 import { zip } from 'fflate'
 import type { TaskRecord } from '../types'
 import { tCurrent } from '../i18n'
+import { imageExtension } from './imageFormats'
 
 /** 下载只包含选中任务的成品，不打包参考图、密钥和任务配置。 */
 export async function buildSelectedImagesZip(tasks: TaskRecord[], readImage: (id: string) => Promise<string | undefined>) {
@@ -11,12 +12,12 @@ export async function buildSelectedImagesZip(tasks: TaskRecord[], readImage: (id
   for (const [taskIndex, task] of tasks.entries()) {
     for (const [imageIndex, id] of task.outputImages.entries()) {
       const dataUrl = await readImage(id)
-      const match = dataUrl?.match(/^data:image\/(png|jpeg|webp);base64,([\s\S]+)$/)
+      const match = dataUrl?.match(/^data:image\/(png|jpeg|webp|gif|svg\+xml);base64,([\s\S]+)$/)
       // 缺失图片时不生成看似完整的压缩包，明确提示用户。
       if (!match) throw new Error(tCurrent('batchImageMissing'))
       const binary = atob(match[2])
       const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0))
-      const extension = match[1] === 'jpeg' ? 'jpg' : match[1]
+      const extension = imageExtension(`image/${match[1]}`)
       // 序号保证同一任务多图和不同任务重复图片不会互相覆盖。
       files[`task-${taskIndex + 1}/image-${imageIndex + 1}.${extension}`] = bytes
       count++

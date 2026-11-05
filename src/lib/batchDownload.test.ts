@@ -9,6 +9,14 @@ const task = (id: string, outputImages: string[]): TaskRecord => ({
 })
 
 describe('batch image download', () => {
+  it('keeps GIF and SVG bytes and extensions in the ZIP', async () => {
+    const images = ['data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH/C05FVFNDQVBFMi4wAwEAAAAh+QQAFAAAACwAAAAAAQABAAACAkQBACH5BAAUAAAALAAAAAABAAEAAAICTAEAOw==', `data:image/svg+xml;base64,${btoa('<svg xmlns="http://www.w3.org/2000/svg"/>')}`]
+    const result = await buildSelectedImagesZip([task('formats', ['0', '1'])], async id => images[Number(id)])
+    const files = unzipSync(result.bytes)
+    for (const [index, ext] of ['gif', 'svg'].entries()) {
+      expect(files[`task-1/image-${index + 1}.${ext}`]).toEqual(Uint8Array.from(atob(images[index].split(',')[1]), char => char.charCodeAt(0)))
+    }
+  })
   it('includes all outputs with distinct filenames and skips empty tasks', async () => {
     const images: Record<string, string> = { a: 'data:image/png;base64,AQID', b: 'data:image/jpeg;base64,BAU=' }
     const result = await buildSelectedImagesZip([task('first', ['a', 'b']), task('empty', []), task('last', ['a'])], async (id) => images[id])

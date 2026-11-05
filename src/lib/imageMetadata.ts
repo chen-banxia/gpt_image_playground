@@ -15,7 +15,8 @@ export async function resolveActualImageParams(dataUrl: string, reported?: Parti
     image.onerror = () => finish()
     image.onload = () => {
       if (!image.naturalWidth || !image.naturalHeight) return finish()
-      const mime = dataUrl.match(/^data:image\/(png|jpeg|webp)[;,]/)?.[1] as TaskParams['output_format'] | undefined
+      const subtype = dataUrl.match(/^data:image\/(png|jpeg|webp|gif|svg\+xml)[;,]/)?.[1]
+      const mime = (subtype === 'svg+xml' ? 'svg' : subtype) as TaskParams['output_format'] | undefined
       finish({
         ...reported,
         size: `${image.naturalWidth}x${image.naturalHeight}`,

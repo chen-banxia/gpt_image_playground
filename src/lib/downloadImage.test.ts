@@ -4,6 +4,20 @@ import { downloadImage } from './downloadImage'
 describe('download tracking', () => {
   afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.useRealTimers() })
 
+  it.each([['gif', 'gif'], ['svg+xml', 'svg']])('downloads %s without converting file contents', async (subtype, extension) => {
+    vi.useFakeTimers()
+    const link = { href: '', download: '', click: vi.fn(), remove: vi.fn() }
+    vi.stubGlobal('document', { createElement: () => link, body: { appendChild: vi.fn() } })
+    const create = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:test')
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
+    const base64 = subtype === 'gif' ? 'R0lGODlhAQABAIAAAAAAAP///yH/C05FVFNDQVBFMi4wAwEAAAAh+QQAFAAAACwAAAAAAQABAAACAkQBACH5BAAUAAAALAAAAAABAAEAAAICTAEAOw==' : btoa('<svg xmlns="http://www.w3.org/2000/svg"/>')
+    await downloadImage(`data:image/${subtype};base64,${base64}`)
+    expect(link.download).toMatch(new RegExp(`\\.${extension}$`))
+    const blob = create.mock.calls[0][0] as Blob
+    expect(blob.type).toBe(`image/${subtype}`)
+    expect(new Uint8Array(await blob.arrayBuffer())).toEqual(Uint8Array.from(atob(base64), char => char.charCodeAt(0)))
+  })
+
   it('marks only after the browser download is triggered and releases the object URL later', async () => {
     vi.useFakeTimers()
     const mark = vi.fn()
