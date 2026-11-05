@@ -4,11 +4,54 @@
 
 ## 默认值与迁移
 
-- 默认图像模型：`gpt-image-2.5-sunburst`，默认质量：`auto`，默认中文，生成预览默认开启。
+- 默认图像模型：`gpt-image-2.6-sunburst`，默认质量：`auto`，默认中文，生成预览默认开启。
+- 新增 `gpt-image-2.6`、`gpt-image-2.6-flare`、`gpt-image-2.6-sunburst`。Images API 的生成/编辑模型与 Responses 的独立图像模型共用选项。持久化版本 7 一次性把上一版默认 `gpt-image-2.5-sunburst` 更新为 2.6 Sunburst（包括 Responses 图像工具）；其他模型选择、文本模型、fal 配置、当前参数与历史记录保持原样，升级后仍可手动选回旧模型。
 - v0.3.6 将旧默认 high 质量迁移为 auto，当前语言迁移为中文并开启预览和本地密钥保存。历史任务不变，升级后可手动切换语言、质量、预览及密钥保存开关。
 - API Key 输入后立即保存至当前浏览器的 localStorage，刷新后保留；清除站点数据、更换浏览器或站点地址后需要重新输入。旧版本未保存且已丢失的密钥无法恢复。
-- GPT Image 2.5 模型提供 `auto / low / medium / high / xhigh / max`。切换至旧模型时，xhigh/max 归一化为 high。
+- GPT Image 2.5 以及 2.6 Sunburst/Flare 提供 `auto / low / medium / high / xhigh / max`。切换至未确认支持扩展质量的模型时，xhigh/max 归一化为 high。
 - Responses 的文本模型使用 `model`，独立图像模型使用 `imageGenerationModel`，请求时传入 `tools[].model`。
+
+### GPT Image 2.6 参数核查状态（2026-11-05）
+
+完整字段、网关扩展与官方不支持项见 [图像参数官方兼容性核查](image-api-compatibility-audit.md)。
+
+首次直连返回 403；随后通过本地 `http://127.0.0.1:7890` 代理成功读取官方文档。该代理仅用于本次文档读取，不写入应用配置。
+
+官方确认 [2.6 Sunburst](https://developers.openai.com/api/docs/models/gpt-image-2.6-sunburst) 和 [2.6 Flare](https://developers.openai.com/api/docs/models/gpt-image-2.6-flare)。无后缀 `gpt-image-2.6` 的模型页返回 404：保留用户指定的模型选项，但不为它假定 GIF、SVG、复杂度和扩展质量能力。三个模型 ID 均原样发送，大尺寸也不自动追加未确认的 `-2k/-4k` 网关后缀。
+
+核查来源：[图像生成指南](https://developers.openai.com/api/docs/guides/image-generation)、[Images 生成参考](https://developers.openai.com/api/reference/resources/images/methods/generate)、[Images 编辑参考](https://developers.openai.com/api/reference/resources/images/methods/edit)、[Responses 创建参考](https://developers.openai.com/api/reference/resources/responses/methods/create)。
+
+| 参数或能力 | 官方说明与本项目适配 |
+| --- | --- |
+| `quality` | 指南确认 2.6 Sunburst/Flare 支持 `xhigh/max`，已开放，保留原有四档。 |
+| `complexity` | `low/medium/high`，独立于渲染质量；Images 省略时默认为 `high`。新增选择器，默认省略字段。生成 JSON、编辑 multipart 和 Responses `tools[]` 均传递显式选择。Responses 省略时可继承外层受支持的 reasoning effort，否则使用模型默认。 |
+| `output_format: gif` | 新增动画生成。默认 `frame_count=9`、`frame_duration_ms=200`。返回仍是 `b64_json`，解码为 GIF 文件。 |
+| `frame_count` | **官方存在冲突**：指南为 2–64，Images/Responses 参数参考为 2–16。本项目采用共同支持的 2–16，默认 9。 |
+| `frame_duration_ms` | 指南和 Responses 参考为 20–2000 毫秒，按 10 毫秒取整；Images 参考给出了更大的编码上限。本项目采用 20–2000，默认 200。 |
+| GIF 尺寸 | `size` 表示单帧尺寸，支持 `auto` 或正数且为 16 倍数的宽高。界面提供 `auto/256x256/512x512`；保留导入的合法尺寸，不套用静态图的最小像素放大规则。总请求像素与模型限制仍由上游校验，建议先用 auto。 |
+| `output_format: svg` | 新增 SVG 生成，强制单张，不流式、不传压缩字段；以 `.svg` 保存原始 UTF-8 XML。未启用需要独立权限的 SVG 作者模型选择。 |
+| `markup` | 官方新增透明 PNG 标注层编辑，和首图同尺寸，与 `mask/prompt_rewriter` 互斥。已核查记录，本次未增加画标注层的编辑器；现有 mask 编辑保持原行为。 |
+
+GIF/SVG 在本项目中用于无参考图、无遮罩的文生图，支持 Images API 和 Responses 的独立图像工具。官方指南明确说 GIF 不支持 Images 编辑，但编辑参考仍列出 GIF 字段；本项目按指南保守阻止这类组合，不猜测编辑能力。SVG 也不可作为后续编辑的栅格输入。
+
+GIF/SVG 自动关闭 `stream`、`partial_images`、自定义压缩、透明背景处理和本地补边/裁剪，不发送 `prompt_rewriter`。Responses 文档允许 GIF 的生命周期事件流，但本项目的流式开关表示图片预览，因此同样关闭。支持成品预览、单文件下载、批量 ZIP、备份导出/导入；全程保留原始字节，避免 GIF 丢帧或 SVG 栅格化。
+
+API 参考注明 GIF 需要相应模型的 GIF preview 权限；官方能力不等于当前兼容网关一定已实现。验证使用模拟 API 响应、双帧 GIF 原始字节、下载/备份往返和本地构建，未发起真实付费生图请求。
+
+示例请求（不使用流式预览）：
+
+```json
+{
+  "model": "gpt-image-2.6-sunburst",
+  "prompt": "一只小猫挥手，动作平滑，首尾衔接循环",
+  "output_format": "gif",
+  "size": "auto",
+  "quality": "medium",
+  "complexity": "medium",
+  "frame_count": 9,
+  "frame_duration_ms": 200
+}
+```
 
 ## 尺寸
 

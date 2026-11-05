@@ -63,7 +63,7 @@ interface ApiProfile {
 
 ```ts
 baseUrl: VITE_DEFAULT_API_URL || 'https://colorflowai.com/v1'
-images model: 'gpt-image-2'
+images model: 'gpt-image-2.6-sunburst'
 responses model: 'gpt-5.5'
 timeout: 600 秒
 apiMode: 'images'
@@ -119,8 +119,11 @@ Content-Type: application/json
 ```ts
 interface TaskParams {
   size: string
-  quality: 'auto' | 'low' | 'medium' | 'high'
-  output_format: 'png' | 'jpeg' | 'webp'
+  quality: 'auto' | 'low' | 'medium' | 'high' | 'xhigh' | 'max'
+  complexity?: 'low' | 'medium' | 'high'
+  frame_count?: number
+  frame_duration_ms?: number
+  output_format: 'png' | 'jpeg' | 'webp' | 'gif' | 'svg'
   output_compression: number | null
   moderation: 'auto' | 'low'
   n: number
@@ -144,8 +147,9 @@ interface TaskParams {
 
 - OpenAI provider 最多 `n=10`。
 - `size` 如果是 `宽x高` 会被规整到 16 的倍数，并限制边长、像素数和宽高比。
-- `output_format='png'` 时，`output_compression` 会被清空为 `null`。
-- `quality` 由用户自由选择，任何模式下都会照原样发送。
+- 非 JPEG/WebP 格式的 `output_compression` 会被清空为 `null`。
+- 2.5 与 2.6 Sunburst/Flare 支持 `xhigh/max`；其他模型归一化为 `high`。
+- 2.6 Sunburst/Flare 新增 `complexity` 与 GIF/SVG 生成，帧参数、端点限制和官方文档差异见 [升级说明](image-upgrade.md)。GIF/SVG 不流式、不本地处理，编辑时须改用栅格静态格式。
 
 ### 2.5 输入图片和大小限制
 
@@ -212,13 +216,16 @@ Authorization: Bearer <apiKey>
 
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
-| `model` | string | 是 | 当前 profile 的模型 ID。Images API 默认 `gpt-image-2`。 |
+| `model` | string | 是 | 当前 profile 的模型 ID。Images API 默认 `gpt-image-2.6-sunburst`。2.6 参数核查状态见 [升级说明](image-upgrade.md)。 |
 | `prompt` | string | 是 | 用户提示词。Codex 模式会加防改写前缀，见第 4 节。 |
 | `size` | string | 是 | 可为 `auto` 或 `1024x1024` 这类尺寸。 |
-| `output_format` | string | 是 | `png`、`jpeg`、`webp`。 |
+| `output_format` | string | 是 | `png`、`jpeg`、`webp`；2.6 Sunburst/Flare 文生图还支持 `gif`、`svg`。 |
 | `moderation` | string | 是 | `auto` 或 `low`。 |
 | `quality` | string | 是 | `auto`、`low`、`medium`、`high`。所有模式都会发送。 |
-| `output_compression` | number | 条件 | 仅当 `output_format !== 'png'` 且不为 `null` 时发送。 |
+| `output_compression` | number | 条件 | 仅 JPEG/WebP 且不为 `null` 时发送。 |
+| `complexity` | string | 条件 | 2.6 Sunburst/Flare 显式设置后发送 `low/medium/high`。 |
+| `frame_count` | number | 条件 | GIF 专用，2–16，默认 9；采用官方指南与 API 参考的共同范围。 |
+| `frame_duration_ms` | number | 条件 | GIF 专用，20–2000，按 10 毫秒取整，默认 200。 |
 | `n` | number | 条件 | 仅当 `n > 1` 时发送。 |
 
 `output_format='jpeg'` 或 `webp` 且设置压缩率时：
